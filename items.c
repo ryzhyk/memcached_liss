@@ -40,9 +40,9 @@ static itemstats_t itemstats[LARGEST_ID];
 static unsigned int sizes[LARGEST_ID];
 
 void item_stats_reset(void) {
-    pthread_mutex_lock(&cache_lock);
+    lock_cache("item_stats_reset");
     memset(itemstats, 0, sizeof(itemstats));
-    pthread_mutex_unlock(&cache_lock);
+    unlock_cache("item_stats_reset");
 }
 
 

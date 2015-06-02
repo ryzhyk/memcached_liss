@@ -8,7 +8,8 @@ testapp_SOURCES = testapp.c util.c util.h
 
 timedrun_SOURCES = timedrun.c
 
-memcached_SOURCES = memcached.c memcached.h \
+memcached_SOURCES = memcached_prof.c \
+		    memcached.c memcached.h \
                     hash.c hash.h \
                     slabs.c slabs.h \
                     items.c items.h \
@@ -17,6 +18,9 @@ memcached_SOURCES = memcached.c memcached.h \
                     stats.c stats.h \
                     util.c util.h \
                     trace.h cache.h sasl_defs.h
+
+memcached_prof.c: memcached_prof.tp
+	lttng-gen-tp $<
 
 if BUILD_CACHE
 memcached_SOURCES += cache.c
@@ -33,10 +37,10 @@ endif
 
 memcached_debug_SOURCES = $(memcached_SOURCES)
 memcached_CPPFLAGS = -DNDEBUG
-memcached_debug_LDADD = @PROFILER_LDFLAGS@
+memcached_debug_LDADD = @PROFILER_LDFLAGS@ -llttng-ust -ldl
 memcached_debug_CFLAGS = @PROFILER_FLAGS@
 
-memcached_LDADD =
+memcached_LDADD = -llttng-ust -ldl
 memcached_DEPENDENCIES =
 memcached_debug_DEPENDENCIES =
 CLEANFILES=
@@ -67,9 +71,9 @@ memcached_debug_dtrace.o: $(memcached_debug_OBJECTS)
 	$(DTRACE) $(DTRACEFLAGS) -G -o memcached_debug_dtrace.o -s ${srcdir}/memcached_dtrace.d $(memcached_debug_OBJECTS)
 
 
-SUBDIRS = doc
+SUBDIRS = 
 DIST_DIRS = scripts
-EXTRA_DIST = doc scripts t memcached.spec memcached_dtrace.d version.m4
+EXTRA_DIST = scripts t memcached.spec memcached_dtrace.d version.m4
 
 MOSTLYCLEANFILES = *.gcov *.gcno *.gcda *.tcov
 

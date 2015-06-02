@@ -1,0 +1,45 @@
+
+TRACEPOINT_EVENT(
+    memcached,
+    lock_cache_req,
+    TP_ARGS(
+        char*, op
+    ),
+    TP_FIELDS(
+        ctf_string(op, op)
+    )
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    lock_cache_acq,
+    TP_ARGS(
+        char*, op
+    ),
+    TP_FIELDS(
+        ctf_string(op, op)
+    )
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    unlock_cache_req,
+    TP_ARGS(
+        char*, op
+    ),
+    TP_FIELDS(
+        ctf_string(op, op)
+    )
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    unlock_cache_done,
+    TP_ARGS(
+        char*, op
+    ),
+    TP_FIELDS(
+        ctf_string(op, op)
+    )
+)
+

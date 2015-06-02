@@ -495,3 +495,7 @@ extern void drop_privileges(void);
 
 #define likely(x)       __builtin_expect((x),1)
 #define unlikely(x)     __builtin_expect((x),0)
+
+void lock_cache(char* op);
+void unlock_cache(char* op);
+
