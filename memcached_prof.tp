@@ -43,3 +43,31 @@ TRACEPOINT_EVENT(
     )
 )
 
+TRACEPOINT_EVENT(
+    memcached,
+    start_calibrate,
+    TP_ARGS(void),
+    TP_FIELDS(ctf_integer(int,dummy,0))
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    end_calibrate,
+    TP_ARGS(void),
+    TP_FIELDS(ctf_integer(int,dummy,0))
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    calib_lock,
+    TP_ARGS(void),
+    TP_FIELDS(ctf_integer(int,dummy,0))
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    calib_unlock,
+    TP_ARGS(void),
+    TP_FIELDS(ctf_integer(int,dummy,0))
+)
+

@@ -80,7 +80,7 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 target_triplet = @target@
-bin_PROGRAMS = memcached$(EXEEXT)
+bin_PROGRAMS = memcached$(EXEEXT) calibrate$(EXEEXT)
 noinst_PROGRAMS = memcached-debug$(EXEEXT) sizes$(EXEEXT) \
 	testapp$(EXEEXT) timedrun$(EXEEXT)
 @BUILD_CACHE_TRUE@am__append_1 = cache.c
@@ -113,6 +113,9 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)" "$(DESTDIR)$(pkgincludedir)"
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
+am_calibrate_OBJECTS = calibrate-memcached_prof.$(OBJEXT) \
+	calibrate-calibrate.$(OBJEXT)
+calibrate_OBJECTS = $(am_calibrate_OBJECTS)
 am__memcached_SOURCES_DIST = memcached_prof.c memcached.c memcached.h \
 	hash.c hash.h slabs.c slabs.h items.c items.h assoc.c assoc.h \
 	thread.c daemon.c stats.c stats.h util.c util.h trace.h \
@@ -193,9 +196,10 @@ AM_V_CCLD = $(am__v_CCLD_@AM_V@)
 am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
 am__v_CCLD_0 = @echo "  CCLD    " $@;
 am__v_CCLD_1 = 
-SOURCES = $(memcached_SOURCES) $(memcached_debug_SOURCES) sizes.c \
-	$(testapp_SOURCES) $(timedrun_SOURCES)
-DIST_SOURCES = $(am__memcached_SOURCES_DIST) \
+SOURCES = $(calibrate_SOURCES) $(memcached_SOURCES) \
+	$(memcached_debug_SOURCES) sizes.c $(testapp_SOURCES) \
+	$(timedrun_SOURCES)
+DIST_SOURCES = $(calibrate_SOURCES) $(am__memcached_SOURCES_DIST) \
 	$(am__memcached_debug_SOURCES_DIST) sizes.c \
 	$(am__testapp_SOURCES_DIST) $(timedrun_SOURCES)
 RECURSIVE_TARGETS = all-recursive check-recursive cscopelist-recursive \
@@ -427,6 +431,9 @@ memcached_SOURCES = memcached_prof.c memcached.c memcached.h hash.c \
 	thread.c daemon.c stats.c stats.h util.c util.h trace.h \
 	cache.h sasl_defs.h $(am__append_1) $(am__append_3) \
 	$(am__append_4)
+calibrate_SOURCES = memcached_prof.c \
+		    calibrate.c
+
 memcached_debug_SOURCES = $(memcached_SOURCES)
 memcached_CPPFLAGS = -DNDEBUG
 memcached_debug_LDADD = @PROFILER_LDFLAGS@ -llttng-ust -ldl \
@@ -435,6 +442,9 @@ memcached_debug_CFLAGS = @PROFILER_FLAGS@
 memcached_LDADD = -llttng-ust -ldl $(am__append_7)
 memcached_DEPENDENCIES = $(am__append_8)
 memcached_debug_DEPENDENCIES = $(am__append_10)
+calibrate_CPPFLAGS = -DNDEBUG
+calibrate_LDADD = -llttng-ust -ldl
+calibrate_DEPENDENCIES = 
 CLEANFILES = $(am__append_6) $(am__append_11)
 SUBDIRS = 
 DIST_DIRS = scripts
@@ -540,6 +550,10 @@ clean-binPROGRAMS:
 clean-noinstPROGRAMS:
 	-test -z "$(noinst_PROGRAMS)" || rm -f $(noinst_PROGRAMS)
 
+calibrate$(EXEEXT): $(calibrate_OBJECTS) $(calibrate_DEPENDENCIES) $(EXTRA_calibrate_DEPENDENCIES) 
+	@rm -f calibrate$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(calibrate_OBJECTS) $(calibrate_LDADD) $(LIBS)
+
 memcached$(EXEEXT): $(memcached_OBJECTS) $(memcached_DEPENDENCIES) $(EXTRA_memcached_DEPENDENCIES) 
 	@rm -f memcached$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(memcached_OBJECTS) $(memcached_LDADD) $(LIBS)
@@ -567,6 +581,8 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cache.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/calibrate-calibrate.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/calibrate-memcached_prof.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcached-assoc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcached-cache.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memcached-daemon.Po@am__quote@
@@ -611,6 +627,34 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
+
+calibrate-memcached_prof.o: memcached_prof.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calibrate_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT calibrate-memcached_prof.o -MD -MP -MF $(DEPDIR)/calibrate-memcached_prof.Tpo -c -o calibrate-memcached_prof.o `test -f 'memcached_prof.c' || echo '$(srcdir)/'`memcached_prof.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/calibrate-memcached_prof.Tpo $(DEPDIR)/calibrate-memcached_prof.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='memcached_prof.c' object='calibrate-memcached_prof.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calibrate_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o calibrate-memcached_prof.o `test -f 'memcached_prof.c' || echo '$(srcdir)/'`memcached_prof.c
+
+calibrate-memcached_prof.obj: memcached_prof.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calibrate_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT calibrate-memcached_prof.obj -MD -MP -MF $(DEPDIR)/calibrate-memcached_prof.Tpo -c -o calibrate-memcached_prof.obj `if test -f 'memcached_prof.c'; then $(CYGPATH_W) 'memcached_prof.c'; else $(CYGPATH_W) '$(srcdir)/memcached_prof.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/calibrate-memcached_prof.Tpo $(DEPDIR)/calibrate-memcached_prof.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='memcached_prof.c' object='calibrate-memcached_prof.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calibrate_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o calibrate-memcached_prof.obj `if test -f 'memcached_prof.c'; then $(CYGPATH_W) 'memcached_prof.c'; else $(CYGPATH_W) '$(srcdir)/memcached_prof.c'; fi`
+
+calibrate-calibrate.o: calibrate.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calibrate_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT calibrate-calibrate.o -MD -MP -MF $(DEPDIR)/calibrate-calibrate.Tpo -c -o calibrate-calibrate.o `test -f 'calibrate.c' || echo '$(srcdir)/'`calibrate.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/calibrate-calibrate.Tpo $(DEPDIR)/calibrate-calibrate.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='calibrate.c' object='calibrate-calibrate.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calibrate_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o calibrate-calibrate.o `test -f 'calibrate.c' || echo '$(srcdir)/'`calibrate.c
+
+calibrate-calibrate.obj: calibrate.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calibrate_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT calibrate-calibrate.obj -MD -MP -MF $(DEPDIR)/calibrate-calibrate.Tpo -c -o calibrate-calibrate.obj `if test -f 'calibrate.c'; then $(CYGPATH_W) 'calibrate.c'; else $(CYGPATH_W) '$(srcdir)/calibrate.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/calibrate-calibrate.Tpo $(DEPDIR)/calibrate-calibrate.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='calibrate.c' object='calibrate-calibrate.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(calibrate_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o calibrate-calibrate.obj `if test -f 'calibrate.c'; then $(CYGPATH_W) 'calibrate.c'; else $(CYGPATH_W) '$(srcdir)/calibrate.c'; fi`
 
 memcached-memcached_prof.o: memcached_prof.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(memcached_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT memcached-memcached_prof.o -MD -MP -MF $(DEPDIR)/memcached-memcached_prof.Tpo -c -o memcached-memcached_prof.o `test -f 'memcached_prof.c' || echo '$(srcdir)/'`memcached_prof.c

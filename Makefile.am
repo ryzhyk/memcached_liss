@@ -1,4 +1,4 @@
-bin_PROGRAMS = memcached
+bin_PROGRAMS = memcached calibrate
 pkginclude_HEADERS = protocol_binary.h
 noinst_PROGRAMS = memcached-debug sizes testapp timedrun
 
@@ -18,6 +18,9 @@ memcached_SOURCES = memcached_prof.c \
                     stats.c stats.h \
                     util.c util.h \
                     trace.h cache.h sasl_defs.h
+
+calibrate_SOURCES = memcached_prof.c \
+		    calibrate.c
 
 memcached_prof.c: memcached_prof.tp
 	lttng-gen-tp $<
@@ -43,6 +46,12 @@ memcached_debug_CFLAGS = @PROFILER_FLAGS@
 memcached_LDADD = -llttng-ust -ldl
 memcached_DEPENDENCIES =
 memcached_debug_DEPENDENCIES =
+
+calibrate_CPPFLAGS = -DNDEBUG
+
+calibrate_LDADD = -llttng-ust -ldl
+calibrate_DEPENDENCIES =
+
 CLEANFILES=
 
 if BUILD_DTRACE
