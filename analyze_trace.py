@@ -14,23 +14,22 @@ NUM_CALIBRATION_CYCLES = 10000000
 
 # find average time between two events in the same thread
 class AvgCyclesBetween:
-    samples = list()
-    perthread = dict()
-
     def __init__(self, start_filter, end_filter):
+        self.samples = list()
+        self.perthread = dict()
         self.start_filter = start_filter
         self.end_filter = end_filter
 
     def push(self, event):
         tid = event['pthread_id']
-        if tid not in self.perthread:
-            self.perthread[tid] = (False, 0)
         if self.start_filter(event):
+            if tid not in self.perthread: self.perthread[tid] = (False, 0)
 #            print('start event')
 #            print(format_event(event))
             assert not self.perthread[tid][0]
             self.perthread[tid] = (True, event['perf_thread_cpu_cycles'])
         if self.end_filter(event):
+            if tid not in self.perthread: self.perthread[tid] = (False, 0)
 #            print('end event')
 #            print(format_event(event))
             assert self.perthread[tid][0]
@@ -41,6 +40,8 @@ class AvgCyclesBetween:
 
     def summary(self):
         print ("#of threads:", len(self.perthread.keys()))
+        print ("samples:", self.samples)
+        
         if len(self.samples) == 0:
             return (0,0.0,0.0)        
         else:
@@ -53,13 +54,12 @@ class AvgCyclesBetween:
 
 # measure the number of contended and uncontended lock acquisitions
 class CountContentions:
-    perthread = dict()
-    samples = []
-    occupants = 0
-    contended = 0
-    uncontended = 0
-
     def __init__(self, start_filter, end_filter):
+        self.perthread = dict()
+        self.samples = []
+        self.occupants = 0
+        self.contended = 0
+        self.uncontended = 0
         self.start_filter = start_filter
         self.end_filter = end_filter
 
@@ -94,22 +94,38 @@ class CountContentions:
 
 
 # extract number of cycles from calibration run
+def dummy_c(col):
+    timer = AvgCyclesBetween(lambda e: e.name == 'memcached:begin' and e['op'] == 'c' , 
+                             lambda e: e.name == 'memcached:end' and e['op'] == 'c')
+
+    for event in col.events:
+        timer.push(event)
+    return timer.summary()
+
+def dummy_n(col):
+    counter = CountContentions(lambda e: e.name == 'memcached:lock', 
+                               lambda e: e.name == 'memcached:unlock')
+    for event in col.events:
+        counter.push(event)
+    return counter.summary()
+
+# extract number of cycles from calibration run
 def calibrate_num_cycles(col):
-    contention = CountContentions(lambda e: e.name == 'memcached:calib_lock' , lambda e: e.name == 'memcached:calib_unlock')
+#    contention = CountContentions(lambda e: e.name == 'memcached:calib_lock' , lambda e: e.name == 'memcached:calib_unlock')
     timer = AvgCyclesBetween(lambda e: e.name == 'memcached:start_calibrate_thread' , lambda e: e.name == 'memcached:end_calibrate_thread')
 
     for event in col.events:
-        if event.name == 'memcached:start_calibrate':
-            start_time = event.cycles
-        if event.name == 'memcached:end_calibrate':
-            end_time = event.cycles
-        contention.push(event)
+#        if event.name == 'memcached:start_calibrate':
+#            start_time = event.cycles
+#        if event.name == 'memcached:end_calibrate':
+#            end_time = event.cycles
+#        contention.push(event)
         timer.push(event)
-    (uncont, cont, m) = contention.summary()
-    (_, avg, dev) = timer.summary()
-    return (end_time - start_time, uncont, cont, m, avg, dev)
+#    (uncont, cont, m) = contention.summary()
+    return timer.summary()
 
-           
+
+
 def analyze_memcached(col):
     print("analyzing memcached trace")
 
@@ -160,14 +176,14 @@ def format_event(event):
     return "{0}: {1}: tid={2}, op={3}".format(event.cycles, event.name.ljust(30), event['pthread_id'], op)
     
 
-def lttng_session(session_name, command, analyzer):
+def lttng_session(session_name, command, names, analyzer):
     ts = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H-%M-%S-%f')
     tracedir = os.environ['HOME'] + "/lttng-traces/" + session_name + "-" + ts
     print('Writing trace to ' + tracedir)
     lttng.destroy(session_name)
     res = lttng.create(session_name, tracedir)
     if res<0:
-        raise Exception(os.strerror(res))
+        raise Exception("Failed to create lttng session")
 
     dom = lttng.Domain()
     dom.type = lttng.DOMAIN_UST
@@ -186,23 +202,16 @@ def lttng_session(session_name, command, analyzer):
     channel.attr.read_timer_interval = 0
     channel.attr.output = lttng.EVENT_MMAP
 
-#    channel = lttng.Channel()
-#    channel.name = "test"
-#    channel.attr.overwrite = 0
-#    channel.attr.subbuf_size = 131072
-#    channel.attr.num_subbuf = 8
-#    channel.attr.switch_timer_interval = 0
-#    channel.attr.read_timer_interval = 200
-#    channel.attr.output = lttng.EVENT_SPLICE
-
     res = lttng.enable_channel(han, channel)
     if res<0:
         raise Exception("Failed to enable channel")
     
-    # lttng enable-event -u 'memcached:*'
-    event = lttng.Event()
-    event.type = lttng.EVENT_TRACEPOINT
-    lttng.enable_event(han, event, "channel0")
+    for n in names:
+        # lttng enable-event -u 'memcached:*'
+        event = lttng.Event()
+        event.type = lttng.EVENT_TRACEPOINT
+        event.name = n
+        lttng.enable_event(han, event, "channel0")
 
     os.system("lttng add-context -s" + session_name + " -u -t perf:thread:cpu-cycles -t pthread_id")
 
@@ -235,21 +244,31 @@ def lttng_session(session_name, command, analyzer):
     return analyzer(col)
 
 if __name__ == '__main__':
-#    # overhead of starting and stopping calibration run with 1 thread
-#    overhead = lttng_session("calibrate", "./calibrate 1 0", calibrate_num_cycles)[0]
-#    # calibration run with 1 thread
-#    cycles = lttng_session("calibrate", "./calibrate 1 " + str(NUM_CALIBRATION_CYCLES), calibrate_num_cycles)[0]
-#    uncontended_cost = (cycles - overhead) / NUM_CALIBRATION_CYCLES
-#    print ("uncontended cost estimation: overhead={0}, calibration time={1}, avg cost={2}".format(overhead, cycles, uncontended_cost))
-#
-#    # overhead of starting and stopping calibration run with multiple threads
-#    overhead = lttng_session("calibrate", "./calibrate " + str(NUM_CALIBRATION_THREADS) + " 0", calibrate_num_cycles)[0]
-
+    l = dict()
     for i in range(1,MAX_CALIBRATION_THREADS+1):
         # calibration run with multiple threads
-        (cycles,uncont,cont,m,threadavg,threaddev) = lttng_session("calibrate", "./calibrate " + str(i) + " " + str(NUM_CALIBRATION_CYCLES), calibrate_num_cycles)
-        contended_cost = threadavg / NUM_CALIBRATION_CYCLES
-        print ("contended cost estimation ({0} threads): calibration time={1}, threadavg={2}, threaddev={3}, cost={4}".
-                format (i, cycles, threadavg, threaddev, contended_cost))
+        res = lttng_session("calibrate", "./calibrate " + str(i) + " " + str(NUM_CALIBRATION_CYCLES), ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
+        l[i] = res[1] / NUM_CALIBRATION_CYCLES
+#        contended_cost = threadavg / NUM_CALIBRATION_CYCLES
 
-    lttng_session("memcached", "./memcached -m 256 -p 11211 -t 8", analyze_memcached)
+    (dummy_c_samples, dummy_c_avg, dummy_c_dev) = lttng_session("dummy", "time ./dummy 4 c 50000 100 100", 
+                                                               ['memcached:begin', 'memcached:end'], dummy_c)
+
+    (dummy_c_fine_samples, dummy_c_fine_avg, dummy_c_fine_dev) = lttng_session("dummy", "time ./dummy 4 f 50000 100 100", 
+                                                                              ['memcached:begin', 'memcached:end'], dummy_c)
+
+    dummy_n_avg = lttng_session("dummy", "time ./dummy 4 c 50000 100 100", 
+                                ['memcached:lock', 'memcached:unlock'], dummy_n)[2]
+
+    dummy_n_fine_avg = lttng_session("dummy", "time ./dummy 4 f 50000 100 100", 
+                                    ['memcached:lock', 'memcached:unlock'], dummy_n)[2]
+
+    for i in range(1,MAX_CALIBRATION_THREADS+1):
+        print ("l({0})={1}".format(i,l[i]))
+    print ("c = {0} (std={1})".format (dummy_c_avg, dummy_c_dev))
+    print ("c-c' = {0} (std={1})".format (dummy_c_fine_avg, dummy_c_fine_dev))
+    print ("n = {0}".format (dummy_n_avg))
+    print ("n' = {0}".format (dummy_n_fine_avg))
+
+
+#    lttng_session("memcached", "./memcached -m 256 -p 11211 -t 8", analyze_memcached)

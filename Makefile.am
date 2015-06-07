@@ -1,6 +1,6 @@
-bin_PROGRAMS = memcached calibrate
+bin_PROGRAMS = memcached calibrate dummy
 pkginclude_HEADERS = protocol_binary.h
-noinst_PROGRAMS = memcached-debug sizes testapp timedrun
+noinst_PROGRAMS = dummy-debug calibrate-debug memcached-debug sizes testapp timedrun
 
 BUILT_SOURCES=
 
@@ -21,6 +21,9 @@ memcached_SOURCES = memcached_prof.c \
 
 calibrate_SOURCES = memcached_prof.c \
 		    calibrate.c
+
+dummy_SOURCES = memcached_prof.c \
+	        dummy.c
 
 memcached_prof.c: memcached_prof.tp
 	lttng-gen-tp $<
@@ -51,6 +54,22 @@ calibrate_CPPFLAGS = -DNDEBUG
 
 calibrate_LDADD = -llttng-ust -ldl
 calibrate_DEPENDENCIES =
+
+calibrate_debug_SOURCES = $(calibrate_SOURCES)
+calibrate_debug_LDADD = @PROFILER_LDFLAGS@ -llttng-ust -ldl
+calibrate_debug_CFLAGS = @PROFILER_FLAGS@
+calibrate_debug_DEPENDENCIES =
+
+dummy_CPPFLAGS = -DNDEBUG
+
+dummy_LDADD = -llttng-ust -ldl
+dummy_DEPENDENCIES =
+
+dummy_debug_SOURCES = $(dummy_SOURCES)
+dummy_debug_LDADD = @PROFILER_LDFLAGS@ -llttng-ust -ldl
+dummy_debug_CFLAGS = @PROFILER_FLAGS@
+dummy_debug_DEPENDENCIES =
+
 
 CLEANFILES=
 
