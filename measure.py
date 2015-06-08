@@ -9,8 +9,9 @@ import datetime
 import subprocess
 import multiprocessing
 
-from analyze import *
+from analyze       import *
 from lttng_wrapper import *
+from solve         import *
 
 MAX_CALIBRATION_THREADS = multiprocessing.cpu_count()
 NUM_CALIBRATION_CYCLES = 10000000
@@ -100,6 +101,8 @@ if __name__ == '__main__':
         l[i] = res[1] / NUM_CALIBRATION_CYCLES
 #        contended_cost = threadavg / NUM_CALIBRATION_CYCLES
 
+#    interpolate_l (l)
+
     (dummy_c_samples, dummy_c_avg, dummy_c_dev) = lttng_session("dummy", "time ./dummy 4 c 100000 100 100", 
                                                                ['memcached:begin', 'memcached:end'], dummy_c)
 
@@ -117,7 +120,10 @@ if __name__ == '__main__':
     print ("c = {0} (std={1})".format (dummy_c_avg, dummy_c_dev))
     print ("c-c' = {0} (std={1})".format (dummy_c_fine_avg, dummy_c_fine_dev))
     print ("n = {0}".format (dummy_n_avg))
-    print ("n' = {0}".format (dummy_n_fine_avg))
+    print ("n' (measured) = {0}".format (dummy_n_fine_avg))
 
+    nn = solve_nn (dummy_n_avg, dummy_c_avg, dummy_c_avg - dummy_c_fine_avg, l)
+    
+    print ("n' (predicted) = {0}".format (nn))
 
 #    lttng_session("memcached", "./memcached -m 256 -p 11211 -t 8", analyze_memcached)

@@ -5,11 +5,6 @@ import time
 import os
 import subprocess
 
-def format_event(event):
-    op = event.get('op', '-')
-    return "{0}: {1}: tid={2}, op={3}".format(event.cycles, event.name.ljust(30), event['pthread_id'], op)
-    
-
 def lttng_session(session_name, command, names, analyzer):
     ts = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H-%M-%S-%f')
     tracedir = os.environ['HOME'] + "/lttng-traces/" + session_name + "-" + ts
