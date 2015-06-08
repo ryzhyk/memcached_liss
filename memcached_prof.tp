@@ -1,5 +1,12 @@
 TRACEPOINT_EVENT(
     memcached,
+    contention,
+    TP_ARGS(unsigned short, cnt),
+    TP_FIELDS(ctf_integer(unsigned short, cnt, cnt))
+)
+
+TRACEPOINT_EVENT(
+    memcached,
     lock,
     TP_ARGS(void),
     TP_FIELDS(ctf_integer(int,dummy,0))

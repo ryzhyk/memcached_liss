@@ -12,6 +12,31 @@ import multiprocessing
 MAX_CALIBRATION_THREADS = multiprocessing.cpu_count()
 NUM_CALIBRATION_CYCLES = 10000000
 
+# Average value of a counter
+class AvgValue:
+    def __init__(self, event_name, cnt_name):
+        self.samples = list()
+        self.event_name = event_name
+        self.cnt_name = cnt_name
+
+    def push(self, event):
+        if self.event_name == event.name:
+            self.samples.append(event[self.cnt_name])
+
+    def summary(self):
+        print ("samples:", self.samples)
+        if len(self.samples) == 0:
+            return 0.0        
+        else:
+            m = statistics.mean(self.samples)
+            if len(self.samples) >= 2:
+                d = statistics.stdev(self.samples, m)
+            else:
+                d = 0.0
+            return (len(self.samples), m, d)
+
+
+
 # find average time between two events in the same thread
 class AvgCyclesBetween:
     def __init__(self, start_filter, end_filter):
@@ -40,7 +65,7 @@ class AvgCyclesBetween:
 
     def summary(self):
         print ("#of threads:", len(self.perthread.keys()))
-        print ("samples:", self.samples)
+#        print ("samples:", self.samples)
         
         if len(self.samples) == 0:
             return (0,0.0,0.0)        
@@ -103,8 +128,7 @@ def dummy_c(col):
     return timer.summary()
 
 def dummy_n(col):
-    counter = CountContentions(lambda e: e.name == 'memcached:lock', 
-                               lambda e: e.name == 'memcached:unlock')
+    counter = AvgValue('memcached:contention', 'cnt')
     for event in col.events:
         counter.push(event)
     return counter.summary()
@@ -245,28 +269,28 @@ def lttng_session(session_name, command, names, analyzer):
 
 if __name__ == '__main__':
     l = dict()
-    for i in range(1,MAX_CALIBRATION_THREADS+1):
-        # calibration run with multiple threads
-        res = lttng_session("calibrate", "./calibrate " + str(i) + " " + str(NUM_CALIBRATION_CYCLES), ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
-        l[i] = res[1] / NUM_CALIBRATION_CYCLES
-#        contended_cost = threadavg / NUM_CALIBRATION_CYCLES
-
-    (dummy_c_samples, dummy_c_avg, dummy_c_dev) = lttng_session("dummy", "time ./dummy 4 c 50000 100 100", 
-                                                               ['memcached:begin', 'memcached:end'], dummy_c)
-
-    (dummy_c_fine_samples, dummy_c_fine_avg, dummy_c_fine_dev) = lttng_session("dummy", "time ./dummy 4 f 50000 100 100", 
-                                                                              ['memcached:begin', 'memcached:end'], dummy_c)
+#    for i in range(1,MAX_CALIBRATION_THREADS+1):
+#        # calibration run with multiple threads
+#        res = lttng_session("calibrate", "./calibrate " + str(i) + " " + str(NUM_CALIBRATION_CYCLES), ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
+#        l[i] = res[1] / NUM_CALIBRATION_CYCLES
+##        contended_cost = threadavg / NUM_CALIBRATION_CYCLES
+#
+#    (dummy_c_samples, dummy_c_avg, dummy_c_dev) = lttng_session("dummy", "time ./dummy 4 c 50000 100 100", 
+#                                                               ['memcached:begin', 'memcached:end'], dummy_c)
+#
+#    (dummy_c_fine_samples, dummy_c_fine_avg, dummy_c_fine_dev) = lttng_session("dummy", "time ./dummy 4 f 50000 100 100", 
+#                                                                              ['memcached:begin', 'memcached:end'], dummy_c)
 
     dummy_n_avg = lttng_session("dummy", "time ./dummy 4 c 50000 100 100", 
-                                ['memcached:lock', 'memcached:unlock'], dummy_n)[2]
+                                ['memcached:contention'], dummy_n)[1]
 
     dummy_n_fine_avg = lttng_session("dummy", "time ./dummy 4 f 50000 100 100", 
-                                    ['memcached:lock', 'memcached:unlock'], dummy_n)[2]
+                                    ['memcached:contention'], dummy_n)[1]
 
-    for i in range(1,MAX_CALIBRATION_THREADS+1):
-        print ("l({0})={1}".format(i,l[i]))
-    print ("c = {0} (std={1})".format (dummy_c_avg, dummy_c_dev))
-    print ("c-c' = {0} (std={1})".format (dummy_c_fine_avg, dummy_c_fine_dev))
+#    for i in range(1,MAX_CALIBRATION_THREADS+1):
+#        print ("l({0})={1}".format(i,l[i]))
+#    print ("c = {0} (std={1})".format (dummy_c_avg, dummy_c_dev))
+#    print ("c-c' = {0} (std={1})".format (dummy_c_fine_avg, dummy_c_fine_dev))
     print ("n = {0}".format (dummy_n_avg))
     print ("n' = {0}".format (dummy_n_fine_avg))
 

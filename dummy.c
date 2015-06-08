@@ -3,6 +3,9 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <memcached_prof.h>
+#include <stdatomic.h>
+
+atomic_ushort contention_counter = 0;
 
 long ncontended;
 long nfalse;
@@ -24,13 +27,15 @@ static void work2() {
 }
 
 static void lock () {
-    tracepoint(memcached, lock);
+    atomic_fetch_add(&contention_counter, 1);
+/*    tracepoint(memcached, lock);*/
     pthread_mutex_lock(&l);
 }
 
 static void unlock () {
     pthread_mutex_unlock(&l);
-    tracepoint(memcached, unlock);
+    atomic_fetch_sub(&contention_counter, 1);
+/*    tracepoint(memcached, unlock);*/
 }
 
 static void* worker_thread_coarse(void*arg) {
@@ -39,6 +44,7 @@ static void* worker_thread_coarse(void*arg) {
     for (j = 0; j < niter; j++) {
         lock();
         tracepoint(memcached, begin, "c");
+        tracepoint(memcached, contention, atomic_load(&contention_counter));
         for (i = 0; i < ncontended; i++, work1());
         for (i = 0; i < nfalse; i++, work2());
         for (i = 0; i < ncontended; i++, work1());
@@ -54,6 +60,7 @@ static void* worker_thread_fine(void*arg) {
     for (j = 0; j < niter; j++) {
         lock();
         for (i = 0; i < ncontended; i++, work1());
+        tracepoint(memcached, contention, atomic_load(&contention_counter));
         unlock();
 
         tracepoint(memcached, begin, "c");
