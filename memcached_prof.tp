@@ -7,6 +7,22 @@ TRACEPOINT_EVENT(
 
 TRACEPOINT_EVENT(
     memcached,
+    begin_idle,
+    TP_ARGS(void),
+    TP_FIELDS(ctf_integer(int,dummy,0))
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    end_idle,
+    TP_ARGS(void),
+    TP_FIELDS(ctf_integer(int,dummy,0))
+)
+
+
+
+TRACEPOINT_EVENT(
+    memcached,
     lock,
     TP_ARGS(void),
     TP_FIELDS(ctf_integer(int,dummy,0))

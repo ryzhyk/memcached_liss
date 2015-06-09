@@ -29,15 +29,14 @@ class AvgValue:
             return (len(self.samples), m, d)
 
 
-
 # find average time between two events in the same thread
 class AvgCyclesBetween:
-    def __init__(self, start_filter, end_filter):
+    def __init__(self, start_filter, end_filter, ts = lambda e: e['perf_thread_cycles']):
         self.samples = list()
         self.perthread = dict()
         self.start_filter = start_filter
         self.end_filter = end_filter
-
+        self.ts_function = ts
     def push(self, event):
         tid = event['pthread_id']
         if self.start_filter(event):
@@ -45,13 +44,13 @@ class AvgCyclesBetween:
 #            print('start event')
 #            print(format_event(event))
             assert not self.perthread[tid][0]
-            self.perthread[tid] = (True, event['perf_thread_cpu_cycles'])
+            self.perthread[tid] = (True, self.ts_function(event))
         if self.end_filter(event):
             if tid not in self.perthread: self.perthread[tid] = (False, 0)
 #            print('end event')
 #            print(format_event(event))
             assert self.perthread[tid][0]
-            cycles = event['perf_thread_cpu_cycles'] - self.perthread[tid][1]
+            cycles = self.ts_function(event) - self.perthread[tid][1]
             self.perthread[tid] = (False, 0)
             self.samples.append(cycles);
 #            print('sample: ', cycles)

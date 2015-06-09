@@ -6,13 +6,13 @@ from scipy.interpolate import interp1d
 def interpolate_l (l):
     x,y = zip(*l.items())
 
-    ll = interp1d(x, y, 'cubic')
+    ll = interp1d(x, y)
     xx = np.linspace(1, max(x), 100)
     
     plt.plot(xx,ll(xx),'r|', x,y,'bo')
-    plt.legend(['data', 'cubic'], loc='best')
+    plt.legend(['data'], loc='best')
     plt.show()
-    return ll
+    return lambda ns: ll(np.maximum(ns, np.ones_like(ns)))
 
 
 def solve_nn (n, c, cc, l):
@@ -31,7 +31,11 @@ def solve_nn (n, c, cc, l):
     # Use the numerical solver to find the roots
 
     nn_initial_guess = n
-    return fsolve(func, nn_initial_guess)
+    sols = fsolve(func, nn_initial_guess)
+    if len(sols) == 0:
+        return 1
+    else:
+        return sols[0]
 
 #print "The solution is tau = %f" % tau_solution
 #print "at which the value of the expression is %f" % func(tau_solution)

@@ -42,7 +42,7 @@ def lttng_session(session_name, command, names, analyzer):
         event.name = n
         lttng.enable_event(han, event, "channel0")
 
-    os.system("lttng add-context -s" + session_name + " -u -t perf:thread:cpu-cycles -t pthread_id")
+    os.system("lttng add-context -s" + session_name + " -u -t perf:thread:cycles -t pthread_id")
 
 #    ctx = lttng.EventContext()
 #    ctx.type = EVENT_CONTEXT_PTHREAD_ID
