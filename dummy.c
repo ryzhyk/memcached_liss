@@ -48,6 +48,7 @@ static void* worker_thread_coarse(void*arg) {
         for (i = 0; i < ncontended; i++, work1());
         for (i = 0; i < nfalse; i++, work2());
         for (i = 0; i < ncontended; i++, work1());
+        for (i = 0; i < nfalse; i++, work2());
         tracepoint(memcached, end, "c");
         unlock();
     };
@@ -59,17 +60,19 @@ static void* worker_thread_fine(void*arg) {
     long j;
     for (j = 0; j < niter; j++) {
         lock();
+        tracepoint(memcached, begin, "c");
         for (i = 0; i < ncontended; i++, work1());
+        tracepoint(memcached, end, "c");
         tracepoint(memcached, contention, atomic_load(&contention_counter));
         unlock();
 
-        tracepoint(memcached, begin, "c");
         for (i = 0; i < nfalse; i++, work2());
-        tracepoint(memcached, end, "c");
 
         lock();
         for (i = 0; i < ncontended; i++, work1());
         unlock();
+
+        for (i = 0; i < nfalse; i++, work2());
     };
     pthread_exit(NULL);
 }

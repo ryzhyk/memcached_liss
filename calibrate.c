@@ -19,9 +19,38 @@ static void* worker_thread_async(void*arg) {
     pthread_exit(NULL);
 }
 
+static void* worker_thread1(void*arg) {
+    int i;
+    volatile int j;
+    tracepoint(memcached, start_calibrate_thread);
+    for (i = 0; i<niter; i++) {
+        pthread_mutex_lock(&lock);
+        for (j=0; j<nidle; j++);
+        pthread_mutex_unlock(&lock);
+    };
+    tracepoint(memcached, end_calibrate_thread);
+    pthread_exit(NULL);
+}
+
+/**/
+/**/
+/*static void* worker_thread1(void*arg) {*/
+/*    int i;*/
+/*    volatile int j;*/
+/*    tracepoint(memcached, start_calibrate_thread);*/
+/*    for (i = 0; i<niter; i++) {*/
+/*        pthread_mutex_lock(&lock);*/
+/*        for (j=0; j<nidle; j++);*/
+/*        pthread_mutex_unlock(&lock);*/
+/*    };*/
+/*    tracepoint(memcached, end_calibrate_thread);*/
+/*    pthread_exit(NULL);*/
+/*}*/
+
 static void* worker_thread(void*arg) {
     int i;
     volatile int j;
+    volatile int k;
     tracepoint(memcached, start_calibrate_thread);
     for (i = 0; i<niter; i++) {
         //tracepoint(memcached, calib_lock);
@@ -29,7 +58,7 @@ static void* worker_thread(void*arg) {
 /*        tracepoint(memcached, calib_lock);*/
         for (j=0; j<nidle; j++);
         pthread_mutex_unlock(&lock);
-        for (j=0; j<nidle/2; j++);
+        for (k=nidle/2; k<nidle; k++);
         //tracepoint(memcached, calib_unlock);
     };
     tracepoint(memcached, end_calibrate_thread);
@@ -63,7 +92,9 @@ int main(int argc, char* argv[]) {
 
     tracepoint(memcached, start_calibrate);
     for (i = 0; i < nthreads; i++) {
-        if (sync)
+        if (sync && (nthreads == 1))
+            rc = pthread_create(&threads[i], NULL, worker_thread1, (void *)NULL);
+        else if (sync)
             rc = pthread_create(&threads[i], NULL, worker_thread, (void *)NULL);
         else
             rc = pthread_create(&threads[i], NULL, worker_thread_async, (void *)NULL);

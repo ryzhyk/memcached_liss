@@ -18,12 +18,13 @@ NUM_CALIBRATION_CYCLES = 20000
 NUM_IDLE_CYCLES = 40000
 
 NUM_DUMMY_RACING_CYCLES = 500
-NUM_DUMMY_INDEPENDENT_CYCLES = 200
+NUM_DUMMY_INDEPENDENT_CYCLES = 5000
 
 # extract number of cycles from calibration run
 def dummy_c(col):
     timer = AvgCyclesBetween(lambda e: e.name == 'memcached:begin' and e['op'] == 'c' , 
-                             lambda e: e.name == 'memcached:end' and e['op'] == 'c')
+                             lambda e: e.name == 'memcached:end' and e['op'] == 'c' ,
+                             lambda e: e.cycles)
 
     for event in col.events:
         timer.push(event)
@@ -112,8 +113,8 @@ def analyze_memcached(col):
 #        d[event['pthread_id']].append(evt_dict)
 #    return d
 
-def dummy_command(locking):
-    return "time ./dummy 4 {0} 100000 {1} {2}".format(locking, NUM_DUMMY_RACING_CYCLES, NUM_DUMMY_INDEPENDENT_CYCLES)
+def dummy_command(threads, locking):
+    return "time ./dummy {0} {1} 100000 {2} {3}".format(threads, locking, NUM_DUMMY_RACING_CYCLES, NUM_DUMMY_INDEPENDENT_CYCLES)
 
 def get_cpu_speed():
     proc = subprocess.Popen(["cat","/proc/cpuinfo"],
@@ -131,18 +132,15 @@ def get_cpu_speed():
 if __name__ == '__main__':
     l = dict()
     #cpu_ghz = get_cpu_speed() / 1000
-    idle = lttng_session("calibrate", "./calibrate a 1" + " " + str(NUM_CALIBRATION_CYCLES) + " " + str(NUM_IDLE_CYCLES), 
+    idle = lttng_session("calibrate", "time ./calibrate a 1" + " " + str(NUM_CALIBRATION_CYCLES) + " " + str(NUM_IDLE_CYCLES), 
                          ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
     idle_cost = idle[1] / NUM_CALIBRATION_CYCLES
     print ("idle calibration cycle estimate: {0}".format(idle_cost))
     for i in range(1,MAX_CALIBRATION_THREADS+1):
         # calibration run with multiple threads
-        res = lttng_session("calibrate", "./calibrate s " + str(i) + " " + str(NUM_CALIBRATION_CYCLES) + " " + str(NUM_IDLE_CYCLES),
+        res = lttng_session("calibrate", "time ./calibrate s " + str(i) + " " + str(NUM_CALIBRATION_CYCLES) + " " + str(NUM_IDLE_CYCLES),
                             ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
-        if i == 1:
-            l[i] = ((res[1] / (i * NUM_CALIBRATION_CYCLES)) - 1.5*idle_cost) 
-        else:
-            l[i] = ((res[1] / (i * NUM_CALIBRATION_CYCLES)) - idle_cost)
+        l[i] = ((res[1] / (i * NUM_CALIBRATION_CYCLES)) - idle_cost)
 #        contended_cost = threadavg / NUM_CALIBRATION_CYCLES
 #    l[3] = l[2]
 #    l[4] = l[2]
@@ -150,26 +148,27 @@ if __name__ == '__main__':
 
     ll = interpolate_l(l)
 
-    (dummy_c_samples, c, dummy_c_dev) = lttng_session("dummy", dummy_command('c'), 
+    (dummy_c_samples, c, dummy_c_dev) = lttng_session("dummy", dummy_command(1, 'c'), 
                                                       ['memcached:begin', 'memcached:end'], dummy_c)
 
-    (dummy_c_fine_samples, dummy_c_fine_avg, dummy_c_fine_dev) = lttng_session("dummy", dummy_command('f'), 
+    (dummy_c_fine_samples, cc05, dummy_c_fine_dev) = lttng_session("dummy", dummy_command(1, 'f'), 
                                                                                ['memcached:begin', 'memcached:end'], dummy_c)
 
-    n = lttng_session("dummy", dummy_command('c'), 
+    n = lttng_session("dummy", dummy_command(multiprocessing.cpu_count(),'c'), 
                       ['memcached:contention'], dummy_n)[1]
 
-    dummy_n_fine_avg = lttng_session("dummy", dummy_command('f'), 
+    dummy_n_fine_avg = lttng_session("dummy", dummy_command(multiprocessing.cpu_count(),'f'), 
                                     ['memcached:contention'], dummy_n)[1]
+
+    cc = cc05 * 2
 
     for i in range(1,MAX_CALIBRATION_THREADS+1):
         print ("l({0})={1}".format(i,l[i]))
     print ("c = {0} (std={1})".format (c, dummy_c_dev))
-    print ("c-c' = {0} (std={1})".format (dummy_c_fine_avg, dummy_c_fine_dev))
+    print ("c' = {0} (std={1})".format (cc, dummy_c_fine_dev))
     print ("n = {0}".format (n))
     print ("n' (measured) = {0}".format (dummy_n_fine_avg))
 
-    cc = c - dummy_c_fine_avg 
 
     nn = solve_nn (n, c, cc, l)
     
@@ -180,5 +179,6 @@ if __name__ == '__main__':
 
     print ("estimated cost of coarse-grained locking: {0}".format(cost_coarse))
     print ("estimated cost of fine-grained locking: {0}".format(cost_fine))
+    print ("speed-up with fine-grained locking:: {0}".format(cost_coarse/cost_fine))
 
 #    lttng_session("memcached", "./memcached -m 256 -p 11211 -t 8", analyze_memcached)
