@@ -17,7 +17,7 @@ MAX_CALIBRATION_THREADS = multiprocessing.cpu_count()
 NUM_CALIBRATION_CYCLES = 20000
 NUM_IDLE_CYCLES = 40000
 
-NUM_DUMMY_RACING_CYCLES = 500
+NUM_DUMMY_RACING_CYCLES = 5000
 NUM_DUMMY_INDEPENDENT_CYCLES = 5000
 
 # extract number of cycles from calibration run
@@ -114,7 +114,7 @@ def analyze_memcached(col):
 #    return d
 
 def dummy_command(threads, locking):
-    return "time ./dummy {0} {1} 100000 {2} {3}".format(threads, locking, NUM_DUMMY_RACING_CYCLES, NUM_DUMMY_INDEPENDENT_CYCLES)
+    return "time ./dummy {0} {1} 10000 {2} {3}".format(threads, locking, NUM_DUMMY_RACING_CYCLES, NUM_DUMMY_INDEPENDENT_CYCLES)
 
 def get_cpu_speed():
     proc = subprocess.Popen(["cat","/proc/cpuinfo"],

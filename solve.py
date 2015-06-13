@@ -17,7 +17,7 @@ def interpolate_l (l):
 
 def solve_nn (n, c, cc, l):
     ll = interpolate_l(l)
-    func = lambda nn : 1 - nn + (n-1) * ((cc + ll(nn)) * nn) / (c - cc + (cc + ll(nn)) * nn)
+    func = lambda nn : 1 - nn + (n-1) * ((cc + 2*ll(nn)) * np.maximum(nn-0.5,np.ones_like(nn))) / (c - cc + (cc + 2*ll(nn)) * np.maximum(nn-0.5,np.ones_like(nn)))
 
     # Plot it
     nn_range = np.linspace(1, max(l.keys()), 100)

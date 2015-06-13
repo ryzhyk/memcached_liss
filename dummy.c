@@ -38,6 +38,13 @@ static void unlock () {
 /*    tracepoint(memcached, unlock);*/
 }
 
+long ndelay = 1000;
+
+static void delay () {
+    long i;
+    for (i = 0; i < ndelay; i++, work2());
+}
+
 static void* worker_thread_coarse(void*arg) {
     long i;
     long j;
@@ -51,6 +58,7 @@ static void* worker_thread_coarse(void*arg) {
         for (i = 0; i < nfalse; i++, work2());
         tracepoint(memcached, end, "c");
         unlock();
+        delay ();
     };
     pthread_exit(NULL);
 }
@@ -69,10 +77,13 @@ static void* worker_thread_fine(void*arg) {
         for (i = 0; i < nfalse; i++, work2());
 
         lock();
+        tracepoint(memcached, begin, "c");
         for (i = 0; i < ncontended; i++, work1());
+        tracepoint(memcached, end, "c");
         unlock();
 
         for (i = 0; i < nfalse; i++, work2());
+        delay();
     };
     pthread_exit(NULL);
 }
