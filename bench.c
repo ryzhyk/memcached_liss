@@ -1,3 +1,10 @@
+#ifdef LISS
+
+#include <langinc.h>
+#include "env.h"
+
+#else
+
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
@@ -6,13 +13,22 @@
 
 #include <memcached_prof.h>
 #include <memcached.h>
-/*#include "items.h"*/
-/*#include "thread.h"*/
+
+#endif
 
 #define NKEYS 1000
 #define ITEM_SIZE 1000
 
 /*#define COARSE*/
+
+#ifdef LISS
+
+#define lock_coarse(op)   {}
+#define unlock_coarse(op) {}
+#define lock_fine(op)     {}
+#define unlock_fine(op)   {}
+
+#else 
 
 #ifdef COARSE
 
@@ -60,19 +76,6 @@
 
 #endif
 
-typedef enum {ACTION_STORE, ACTION_GET, ACTION_DELETE} op_t;
-
-atomic_ushort contention_counter = 0;
-
-atomic_ushort inside_c = 0;
-atomic_ushort inside_cc = 0;
-atomic_ushort num_sections = 0;
-
-static enum store_item_type do_store(item *it, int comm);
-static void op_store();
-static void op_get();
-static void op_delete();
-
 static void lock(char* op) {
     atomic_fetch_add(&contention_counter, 1);
     pthread_mutex_lock(&cache_lock);
@@ -83,14 +86,32 @@ static void unlock(char * op) {
     atomic_fetch_sub(&contention_counter, 1);
 }
 
+#endif
 
-void *monitor_thread(void *arg) {
+typedef enum {ACTION_STORE, ACTION_GET, ACTION_DELETE} op_t;
+
+#ifndef LISS
+atomic_ushort contention_counter = 0;
+
+atomic_ushort inside_c = 0;
+atomic_ushort inside_cc = 0;
+atomic_ushort num_sections = 0;
+#endif
+
+static enum store_item_type do_store(item *it, int comm);
+static void op_store();
+static void op_get();
+static void op_delete();
+
+#ifndef LISS
+void *monitor(void *arg) {
     while (1) {
         if (atomic_load(&inside_c))
             tracepoint(memcached, inside_cc, atomic_load(&inside_cc));
         usleep(100);
     };
 }
+#endif
 
 void random_op () {
     op_t op;
@@ -270,3 +291,23 @@ static enum store_item_type do_store(item *it, int comm) {
 
     return stored;
 }
+
+#ifdef LISS
+
+void tfunc () {
+    while (nondet) {
+        random_op();
+        yield();
+    };
+}
+
+void thread_1() {
+    tfunc();
+}
+
+void thread_2() {
+    tfunc();
+}
+
+
+#endif
