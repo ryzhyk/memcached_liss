@@ -1,3 +1,5 @@
+#! /usr/bin/python3
+
 import sys
 from collections import Counter
 import babeltrace
@@ -14,35 +16,42 @@ from lttng_wrapper import *
 from solve         import *
 
 MAX_CALIBRATION_THREADS = multiprocessing.cpu_count()
-NUM_CALIBRATION_CYCLES = 20000
-NUM_IDLE_CYCLES = 40000
+NUM_CALIBRATION_CYCLES = 10000
+NUM_IDLE_CYCLES = 80000
 
 NUM_DUMMY_RACING_CYCLES = 5000
 NUM_DUMMY_INDEPENDENT_CYCLES = 5000
 
 # extract number of cycles from calibration run
-def dummy_c(col):
-    timer = AvgCyclesBetween(lambda e: e.name == 'memcached:begin' and e['op'] == 'c' , 
-                             lambda e: e.name == 'memcached:end' and e['op'] == 'c' ,
-                             lambda e: e.cycles)
+def measure_c(col):
+    timer = AvgCyclesBetween(lambda e: e.name == 'memcached:c_end',
+                             lambda e: e.name == 'memcached:c_begin', 
+                             lambda e: e.name == 'memcached:c_end')
+    counter = AvgValue('memcached:inside_cc', 'inside')
+    counter_sections = AvgValue('memcached:c_end', 'num_sections')
 
     for event in col.events:
         timer.push(event)
-    return timer.summary()
+        counter.push(event)
+        counter_sections.push(event)
+    (samples, c, c_dev) = timer.summary()
+    cc = counter.summary()[1] * c
+    sections = counter_sections.summary()[1]
+    return (samples, c, cc, c_dev, sections)
 
-def dummy_n(col):
+def measure_n(col):
     counter = AvgValue('memcached:contention', 'cnt')
     for event in col.events:
         counter.push(event)
     return counter.summary()
 
-def calibrate_idle_cost(col):
-#    contention = CountContentions(lambda e: e.name == 'memcached:calib_lock' , lambda e: e.name == 'memcached:calib_unlock')
-    timer = AvgCyclesBetween(lambda e: e.name == 'memcached:begin_idle' , lambda e: e.name == 'memcached:end_idle', lambda e: e.cycles)
-
-    for event in col.events:
-        timer.push(event)
-    return timer.summary()
+#def calibrate_idle_cost(col):
+##    contention = CountContentions(lambda e: e.name == 'memcached:calib_lock' , lambda e: e.name == 'memcached:calib_unlock')
+#    timer = AvgCyclesBetween(lambda e: e.name == 'memcached:begin_idle' , lambda e: e.name == 'memcached:end_idle', lambda e: e.cycles)
+#
+#    for event in col.events:
+#        timer.push(event)
+#    return timer.summary()
 
 
 def calibrate_contention(col):
@@ -54,7 +63,9 @@ def calibrate_contention(col):
 # extract number of cycles from calibration run
 def calibrate_num_cycles(col):
 #    contention = CountContentions(lambda e: e.name == 'memcached:calib_lock' , lambda e: e.name == 'memcached:calib_unlock')
-    timer = AvgCyclesBetween(lambda e: e.name == 'memcached:start_calibrate_thread' , lambda e: e.name == 'memcached:end_calibrate_thread', lambda e: e.cycles)
+    timer = AvgCyclesBetween( lambda e: e.name == 'memcached:end_calibrate_thread'
+                            , lambda e: e.name == 'memcached:start_calibrate_thread' 
+                            , lambda e: e.name == 'memcached:end_calibrate_thread')
 
     for event in col.events:
 #        if event.name == 'memcached:start_calibrate':
@@ -66,55 +77,14 @@ def calibrate_num_cycles(col):
 #    (uncont, cont, m) = contention.summary()
     return timer.summary()
 
-
-
-def analyze_memcached(col):
-    print("analyzing memcached trace")
-
-    # create analyzers
-    counter = AvgCyclesBetween(lambda e: e.name == 'memcached:lock_cache_req' , lambda e: e.name == 'memcached:unlock_cache_done')
-    contention = CountContentions(lambda e: e.name == 'memcached:lock_cache_req' , lambda e: e.name == 'memcached:unlock_cache_done')
-    analyzers = [counter, contention]
-
-    for event in col.events:
-        for a in analyzers:
-            a.push(event)
-#    for a in analyzers:
-#        a.summary()
-
-    # split trace into per-thread traces
-#    traces = per_thread_traces(col)
-    
-    # serialize per-thread traces 
-#    serialized = sum(traces.values(), [])
-    #for event in serialized:
-    #    print(format_event(event))
-
-    (nsamples, avg, dev) = counter.summary()
-    print('Average cycles between memcached:lock_cache_req and memcached:unlock_cache_done:', avg, ' std deviation:', dev)
-
-    (uncont, cont, m) = contention.summary()
-    print('Uncontended:', uncont, 'contended:', cont, 'mean contention:', m)
-
-#    for tid in traces.keys():
-#        print('Thread ', str(tid), ':', str(len(traces[tid])), " events")
-#        print(*traces[tid], sep='\n')
-
-# obtain per-thread traces
-#def per_thread_traces(col):
-#    d = dict()
-#    i = 0
-#    for event in col.events:
-#        if event['pthread_id'] not in d:
-#            print('new tid: ', event['pthread_id'])
-#            d[event['pthread_id']] = []
-#        evt_dict = dict(event.items())
-#        evt_dict['name'] = event.name
-#        d[event['pthread_id']].append(evt_dict)
-#    return d
-
 def dummy_command(threads, locking):
     return "time ./dummy {0} {1} 10000 {2} {3}".format(threads, locking, NUM_DUMMY_RACING_CYCLES, NUM_DUMMY_INDEPENDENT_CYCLES)
+
+def memcached_command(threads, locking):
+    if locking == 'c':
+        return "time ./memcached_c -t {0}".format(threads)
+    else:
+        return "time ./memcached_f -t {0}".format(threads)
 
 def get_cpu_speed():
     proc = subprocess.Popen(["cat","/proc/cpuinfo"],
@@ -128,6 +98,22 @@ def get_cpu_speed():
 
     return speed
 
+def profile_locks(cmd):
+    (c_samples, c, cc, c_dev, sections) = lttng_session( "profile_c"
+                                                       , cmd(1, 'c')
+                                                       , ['memcached:c_begin', 'memcached:c_end', 'memcached:inside_cc']
+                                                       , measure_c)
+
+    n = lttng_session( "profile_n"
+                     , cmd(multiprocessing.cpu_count(),'c')
+                     , ['memcached:contention']
+                     , measure_n)[1]
+
+    nn = lttng_session( "profile_contention"
+                      , cmd(multiprocessing.cpu_count(),'f')
+                      , ['memcached:contention']
+                      , measure_n)[1]
+    return((c,c_dev),cc,n,nn,sections)
 
 if __name__ == '__main__':
     l = dict()
@@ -140,45 +126,31 @@ if __name__ == '__main__':
         # calibration run with multiple threads
         res = lttng_session("calibrate", "time ./calibrate s " + str(i) + " " + str(NUM_CALIBRATION_CYCLES) + " " + str(NUM_IDLE_CYCLES),
                             ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
-        l[i] = ((res[1] / (i * NUM_CALIBRATION_CYCLES)) - idle_cost)
+        l[i] = ((res[1] / (NUM_CALIBRATION_CYCLES)) - idle_cost)
 #        contended_cost = threadavg / NUM_CALIBRATION_CYCLES
 #    l[3] = l[2]
 #    l[4] = l[2]
     print("l: {0}".format(l))
 
     ll = interpolate_l(l)
-
-    (dummy_c_samples, c, dummy_c_dev) = lttng_session("dummy", dummy_command(1, 'c'), 
-                                                      ['memcached:begin', 'memcached:end'], dummy_c)
-
-    (dummy_c_fine_samples, cc05, dummy_c_fine_dev) = lttng_session("dummy", dummy_command(1, 'f'), 
-                                                                               ['memcached:begin', 'memcached:end'], dummy_c)
-
-    n = lttng_session("dummy", dummy_command(multiprocessing.cpu_count(),'c'), 
-                      ['memcached:contention'], dummy_n)[1]
-
-    dummy_n_fine_avg = lttng_session("dummy", dummy_command(multiprocessing.cpu_count(),'f'), 
-                                    ['memcached:contention'], dummy_n)[1]
-
-    cc = cc05 * 2
+#    ((c,c_dev),(cc,cc_dev),n,nn_measured) = profile_locks(dummy_command)
+    ((c,c_dev),cc,n,nn_measured,sections) = profile_locks(memcached_command)
 
     for i in range(1,MAX_CALIBRATION_THREADS+1):
         print ("l({0})={1}".format(i,l[i]))
-    print ("c = {0} (std={1})".format (c, dummy_c_dev))
-    print ("c' = {0} (std={1})".format (cc, dummy_c_fine_dev))
+    print ("c = {0} (std={1})".format (c, c_dev))
+    print ("c' = {0}".format (cc))
+    print ("#crit sections = {0}".format (sections))
     print ("n = {0}".format (n))
-    print ("n' (measured) = {0}".format (dummy_n_fine_avg))
+    print ("n' (measured) = {0}".format (nn_measured))
 
-
-    nn = solve_nn (n, c, cc, l)
+    nn = solve_nn (n, c, cc, l, sections)
     
     print ("n' (predicted) = {0}".format (nn))
 
-    cost_coarse = n * c + ll(n)
-    cost_fine   = cc * nn + (c-cc) + 2 * ll(nn)
+    cost_coarse = n * (c + ll(n))
+    cost_fine   = nn * (cc + sections * ll(nn)) + (c-cc)
 
     print ("estimated cost of coarse-grained locking: {0}".format(cost_coarse))
     print ("estimated cost of fine-grained locking: {0}".format(cost_fine))
     print ("speed-up with fine-grained locking:: {0}".format(cost_coarse/cost_fine))
-
-#    lttng_session("memcached", "./memcached -m 256 -p 11211 -t 8", analyze_memcached)

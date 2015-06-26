@@ -1,9 +1,47 @@
+
+TRACEPOINT_EVENT(
+    memcached,
+    inside_cc,
+    TP_ARGS(unsigned short, inside),
+    TP_FIELDS(ctf_integer(unsigned short, inside, inside))
+)
+
+
 TRACEPOINT_EVENT(
     memcached,
     contention,
     TP_ARGS(unsigned short, cnt),
     TP_FIELDS(ctf_integer(unsigned short, cnt, cnt))
 )
+
+TRACEPOINT_EVENT(
+    memcached,
+    c_begin,
+    TP_ARGS(void),
+    TP_FIELDS(ctf_integer(int,dummy,0))
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    c_end,
+    TP_ARGS(unsigned short, num_sections),
+    TP_FIELDS(ctf_integer(unsigned short,num_sections,num_sections))
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    cc_begin,
+    TP_ARGS(void),
+    TP_FIELDS(ctf_integer(int,dummy,0))
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    cc_end,
+    TP_ARGS(void),
+    TP_FIELDS(ctf_integer(int,dummy,0))
+)
+
 
 TRACEPOINT_EVENT(
     memcached,

@@ -50,13 +50,13 @@ static void* worker_thread_coarse(void*arg) {
     long j;
     for (j = 0; j < niter; j++) {
         lock();
-        tracepoint(memcached, begin, "c");
+        tracepoint(memcached, c_begin);
         tracepoint(memcached, contention, atomic_load(&contention_counter));
         for (i = 0; i < ncontended; i++, work1());
         for (i = 0; i < nfalse; i++, work2());
         for (i = 0; i < ncontended; i++, work1());
         for (i = 0; i < nfalse; i++, work2());
-        tracepoint(memcached, end, "c");
+        tracepoint(memcached, c_end, 2);
         unlock();
         delay ();
     };
@@ -68,18 +68,20 @@ static void* worker_thread_fine(void*arg) {
     long j;
     for (j = 0; j < niter; j++) {
         lock();
-        tracepoint(memcached, begin, "c");
+        tracepoint(memcached, c_begin);
+        tracepoint(memcached, cc_begin);
         for (i = 0; i < ncontended; i++, work1());
-        tracepoint(memcached, end, "c");
+        tracepoint(memcached, cc_end);
         tracepoint(memcached, contention, atomic_load(&contention_counter));
         unlock();
 
         for (i = 0; i < nfalse; i++, work2());
 
         lock();
-        tracepoint(memcached, begin, "c");
+        tracepoint(memcached, cc_begin);
         for (i = 0; i < ncontended; i++, work1());
-        tracepoint(memcached, end, "c");
+        tracepoint(memcached, cc_end);
+        tracepoint(memcached, c_end, 2);
         unlock();
 
         for (i = 0; i < nfalse; i++, work2());

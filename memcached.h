@@ -421,6 +421,9 @@ struct conn {
 /* current time of day (updated periodically) */
 extern volatile rel_time_t current_time;
 
+
+rel_time_t realtime(const time_t exptime);
+
 /*
  * Functions
  */
@@ -432,6 +435,7 @@ conn *conn_new(const int sfd, const enum conn_states init_state, const int event
 extern int daemonize(int nochdir, int noclose);
 
 
+#include "bench.h"
 #include "stats.h"
 #include "slabs.h"
 #include "assoc.h"

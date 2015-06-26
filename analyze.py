@@ -31,32 +31,39 @@ class AvgValue:
 
 # find average time between two events in the same thread
 class AvgCyclesBetween:
-    def __init__(self, start_filter, end_filter, ts = lambda e: e['perf_thread_cycles']):
+    def __init__(self, reset_filter, start_filter, end_filter, ts = lambda e: e['perf_thread_cycles']):
         self.samples = list()
         self.perthread = dict()
         self.start_filter = start_filter
         self.end_filter = end_filter
+        self.reset_filter = reset_filter
         self.ts_function = ts
+
     def push(self, event):
         tid = event['pthread_id']
         if self.start_filter(event):
-            if tid not in self.perthread: self.perthread[tid] = (False, 0)
+            if tid not in self.perthread: self.perthread[tid] = (False, 0, 0)
 #            print('start event')
 #            print(format_event(event))
             assert not self.perthread[tid][0]
-            self.perthread[tid] = (True, self.ts_function(event))
+            self.perthread[tid] = (True, self.ts_function(event), self.perthread[tid][2])
         if self.end_filter(event):
-            if tid not in self.perthread: self.perthread[tid] = (False, 0)
+            if tid not in self.perthread: self.perthread[tid] = (False, 0, 0)
 #            print('end event')
 #            print(format_event(event))
             assert self.perthread[tid][0]
             cycles = self.ts_function(event) - self.perthread[tid][1]
-            self.perthread[tid] = (False, 0)
-            self.samples.append(cycles);
+            self.perthread[tid] = (False, 0, self.perthread[tid][2] + cycles)
 #            print('sample: ', cycles)
 
+        if self.reset_filter(event):
+            if tid not in self.perthread: self.perthread[tid] = (False, 0, 0)
+            self.samples.append(self.perthread[tid][2])
+            self.perthread[tid] = (False, 0, 0)
+
+
     def summary(self):
-        print ("#of threads:", len(self.perthread.keys()))
+#        print ("#of threads:", len(self.perthread.keys()))
 #        print ("samples:", self.samples)
         
         if len(self.samples) == 0:

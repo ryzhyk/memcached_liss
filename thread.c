@@ -10,8 +10,12 @@
 #include <errno.h>
 #include <string.h>
 #include <pthread.h>
+#include <time.h>
 
 #include "memcached_prof.h"
+
+//#define NBENCH_ITERATIONS 1000000
+#define NBENCH_ITERATIONS 500000
 
 #define ITEMS_PER_ALLOC 64
 
@@ -164,7 +168,7 @@ static void cqi_free(CQ_ITEM *item) {
 /*
  * Creates a worker thread.
  */
-static void create_worker(void *(*func)(void *), void *arg) {
+static pthread_t create_worker(void *(*func)(void *), void *arg) {
     pthread_t       thread;
     pthread_attr_t  attr;
     int             ret;
@@ -176,6 +180,7 @@ static void create_worker(void *(*func)(void *), void *arg) {
                 strerror(ret));
         exit(1);
     }
+    return thread;
 }
 
 /*
@@ -232,8 +237,25 @@ static void setup_thread(LIBEVENT_THREAD *me) {
 /*
  * Worker thread: main event loop
  */
-static void *worker_libevent(void *arg) {
-    LIBEVENT_THREAD *me = arg;
+//static void *worker_libevent(void *arg) {
+//    LIBEVENT_THREAD *me = arg;
+//
+//    /* Any per-thread setup can happen here; thread_init() will block until
+//     * all threads have finished initializing.
+//     */
+//
+//    pthread_mutex_lock(&init_lock);
+//    init_count++;
+//    pthread_cond_signal(&init_cond);
+//    pthread_mutex_unlock(&init_lock);
+//
+//    event_base_loop(me->base, 0);
+//    return NULL;
+//}
+
+static void *worker_bench(void *arg) {
+/*    LIBEVENT_THREAD *me = arg;*/
+    unsigned long i;
 
     /* Any per-thread setup can happen here; thread_init() will block until
      * all threads have finished initializing.
@@ -244,10 +266,12 @@ static void *worker_libevent(void *arg) {
     pthread_cond_signal(&init_cond);
     pthread_mutex_unlock(&init_lock);
 
-    event_base_loop(me->base, 0);
+    //event_base_loop(me->base, 0);
+    for (i = 0; i < NBENCH_ITERATIONS; i++) {
+        random_op ();
+    };
     return NULL;
 }
-
 
 /*
  * Processes an incoming "handle a new connection" item. This is called when
@@ -326,17 +350,11 @@ int is_listen_thread() {
 /********************************* ITEM ACCESS *******************************/
 
 void lock_cache(char* op) {
-    //printf("lock cache");
-    tracepoint(memcached, lock_cache_req, op);
     pthread_mutex_lock(&cache_lock);
-    tracepoint(memcached, lock_cache_acq, op);
-    //printf("done");
 }
 
 void unlock_cache(char * op) {
-    tracepoint(memcached, unlock_cache_req, op);
     pthread_mutex_unlock(&cache_lock);
-    tracepoint(memcached, unlock_cache_done, op);
 }
 
 /*
@@ -603,6 +621,9 @@ void slab_stats_aggregate(struct thread_stats *stats, struct slab_stats *out) {
  */
 void thread_init(int nthreads, struct event_base *main_base) {
     int         i;
+    int         rc;
+    pthread_t   mthread;
+    pthread_t   *pthreads = calloc (nthreads, sizeof(pthread_t));
 
     pthread_mutex_init(&cache_lock, NULL);
     pthread_mutex_init(&stats_lock, NULL);
@@ -635,9 +656,12 @@ void thread_init(int nthreads, struct event_base *main_base) {
         setup_thread(&threads[i]);
     }
 
+    srandom(time(NULL));
+    pthread_create(&mthread, NULL, monitor_thread, NULL);
+
     /* Create threads after we've done all the libevent setup. */
     for (i = 0; i < nthreads; i++) {
-        create_worker(worker_libevent, &threads[i]);
+        pthreads[i] = create_worker(/*worker_libevent*/worker_bench, &threads[i]);
     }
 
     /* Wait for all the threads to set themselves up before returning. */
@@ -646,5 +670,14 @@ void thread_init(int nthreads, struct event_base *main_base) {
         pthread_cond_wait(&init_cond, &init_lock);
     }
     pthread_mutex_unlock(&init_lock);
+
+    for (i = 0; i < nthreads; i++) {
+        rc = pthread_join(pthreads[i], NULL);
+        if (rc) {
+            fprintf(stderr, "ERROR; return code from pthread_join(%i) is %d\n", i, rc);
+            exit(-1);
+        };
+    };
+    exit (0);
 }
 

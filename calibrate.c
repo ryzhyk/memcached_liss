@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
         if (sync && (nthreads == 1))
             rc = pthread_create(&threads[i], NULL, worker_thread1, (void *)NULL);
         else if (sync)
-            rc = pthread_create(&threads[i], NULL, worker_thread, (void *)NULL);
+            rc = pthread_create(&threads[i], NULL, worker_thread1, (void *)NULL);
         else
             rc = pthread_create(&threads[i], NULL, worker_thread_async, (void *)NULL);
         if (rc){
