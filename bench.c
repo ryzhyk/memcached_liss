@@ -21,6 +21,14 @@
 
 /*#define COARSE*/
 
+#ifndef LISS
+atomic_ushort contention_counter = 0;
+
+atomic_ushort inside_c = 0;
+atomic_ushort inside_cc = 0;
+atomic_ushort num_sections = 0;
+#endif
+
 #ifdef LISS
 
 #define lock_coarse(op)   {}
@@ -90,21 +98,13 @@ static void unlock(char * op) {
 
 typedef enum {ACTION_STORE, ACTION_GET, ACTION_DELETE} op_t;
 
-#ifndef LISS
-atomic_ushort contention_counter = 0;
-
-atomic_ushort inside_c = 0;
-atomic_ushort inside_cc = 0;
-atomic_ushort num_sections = 0;
-#endif
-
 static enum store_item_type do_store(item *it, int comm);
 static void op_store();
 static void op_get();
 static void op_delete();
 
 #ifndef LISS
-void *monitor(void *arg) {
+void *monitor_thread(void *arg) {
     while (1) {
         if (atomic_load(&inside_c))
             tracepoint(memcached, inside_cc, atomic_load(&inside_cc));
