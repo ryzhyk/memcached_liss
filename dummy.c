@@ -45,47 +45,61 @@ static void delay () {
     for (i = 0; i < ndelay; i++, work2());
 }
 
-static void* worker_thread_coarse(void*arg) {
+static void shared1 () {
     long i;
+    for (i = 0; i < ncontended; i++, work1());
+}
+
+static void shared2 () {
+    shared1();
+}
+
+static void shared3 () {
+    shared1();
+}
+
+static void local () {
+    long i;
+    for (i = 0; i < nfalse; i++, work2());
+}
+
+static void* worker_thread_coarse(void*arg) {
     long j;
     for (j = 0; j < niter; j++) {
         lock();
         tracepoint(memcached, c_begin);
         tracepoint(memcached, contention, atomic_load(&contention_counter));
-        for (i = 0; i < ncontended; i++, work1());
-        for (i = 0; i < nfalse; i++, work2());
-        for (i = 0; i < ncontended; i++, work1());
-        for (i = 0; i < nfalse; i++, work2());
+        shared1();
+        shared2();
+        local();
+        shared3();
         tracepoint(memcached, c_end, 2);
         unlock();
-        delay ();
     };
     pthread_exit(NULL);
 }
 
 static void* worker_thread_fine(void*arg) {
-    long i;
     long j;
     for (j = 0; j < niter; j++) {
         lock();
         tracepoint(memcached, c_begin);
         tracepoint(memcached, cc_begin);
-        for (i = 0; i < ncontended; i++, work1());
+        shared1();
         tracepoint(memcached, cc_end);
         tracepoint(memcached, contention, atomic_load(&contention_counter));
         unlock();
 
-        for (i = 0; i < nfalse; i++, work2());
+        local();
 
         lock();
         tracepoint(memcached, cc_begin);
-        for (i = 0; i < ncontended; i++, work1());
+        shared3();
         tracepoint(memcached, cc_end);
         tracepoint(memcached, c_end, 2);
         unlock();
 
-        for (i = 0; i < nfalse; i++, work2());
-        delay();
+/*        for (i = 0; i < nfalse; i++, work2());*/
     };
     pthread_exit(NULL);
 }
