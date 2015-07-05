@@ -36,6 +36,10 @@ atomic_ushort num_sections = 0;
 #define lock_fine(op)     {}
 #define unlock_fine(op)   {}
 
+int global_dummy;
+
+#define READ_DUMMY {int local_dummy = global_dummy;}
+
 #else 
 
 #ifdef COARSE
@@ -125,11 +129,14 @@ void random_op () {
     };
 
     lock_coarse("op_store");
-    switch (op) {
-        case ACTION_STORE:  op_store();
-        case ACTION_GET:    op_get();
-        case ACTION_DELETE: op_delete();
-    };  
+    op_store();
+//    if (op == ACTION_STORE) {
+//        op_store();
+//    } /*else if (op == ACTION_GET) {
+//        op_get();
+//    } */ else {
+//        op_delete();
+//    };
     unlock_coarse("op_store");
 }
 
@@ -252,6 +259,7 @@ static enum store_item_type do_store(item *it, int comm) {
                 return NOT_STORED;
             }
 
+            yield();
             /* copy data from it and old_it to new_it */
 
             if (comm == NREAD_APPEND) {
@@ -262,6 +270,8 @@ static enum store_item_type do_store(item *it, int comm) {
                 memcpy(ITEM_data(new_it), ITEM_data(it), it->nbytes);
                 memcpy(ITEM_data(new_it) + it->nbytes - 2 /* CRLF */, ITEM_data(old_it), old_it->nbytes);
             }
+
+            READ_DUMMY;
 
             it = new_it;
         }
