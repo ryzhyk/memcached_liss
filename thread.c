@@ -15,7 +15,7 @@
 #include "memcached_prof.h"
 
 //#define NBENCH_ITERATIONS 1000000
-#define NBENCH_ITERATIONS 500000
+//#define NBENCH_ITERATIONS 500000
 
 #define ITEMS_PER_ALLOC 64
 
@@ -267,7 +267,7 @@ static void *worker_bench(void *arg) {
     pthread_mutex_unlock(&init_lock);
 
     //event_base_loop(me->base, 0);
-    for (i = 0; i < NBENCH_ITERATIONS; i++) {
+    for (i = 0; i < settings.nbench_iterations; i++) {
         random_op ();
     };
     return NULL;

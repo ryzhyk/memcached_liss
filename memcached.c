@@ -174,6 +174,7 @@ static void stats_reset(void) {
 }
 
 static void settings_init(void) {
+    settings.nbench_iterations = 500000,
     settings.use_cas = true;
     settings.access = 0700;
     settings.port = 11211;
@@ -195,6 +196,7 @@ static void settings_init(void) {
     settings.backlog = 1024;
     settings.binding_protocol = negotiating_prot;
     settings.item_size_max = 1024 * 1024; /* The famous 1MB upper limit. */
+    settings.item_size = 1024;
 }
 
 /*
@@ -4282,6 +4284,8 @@ int main (int argc, char **argv) {
 
     /* process arguments */
     while (-1 != (c = getopt(argc, argv,
+          "j:"  /* item size */
+          "N:"
           "a:"  /* access mask for unix socket */
           "p:"  /* TCP port number to listen on */
           "s:"  /* unix socket path to listen on */
@@ -4310,6 +4314,12 @@ int main (int argc, char **argv) {
           "S"   /* Sasl ON */
         ))) {
         switch (c) {
+        case 'N':
+            settings.nbench_iterations = atoi(optarg);
+            break; 
+        case 'j':
+            settings.item_size = atoi(optarg);
+            break; 
         case 'a':
             /* access for unix domain socket, as octal mask (like chmod)*/
             settings.access= strtol(optarg,NULL,8);
@@ -4338,9 +4348,9 @@ int main (int argc, char **argv) {
         case 'h':
             usage();
             exit(EXIT_SUCCESS);
-        case 'i':
-            usage_license();
-            exit(EXIT_SUCCESS);
+//        case 'i':
+//            usage_license();
+//            exit(EXIT_SUCCESS);
         case 'k':
             lock_memory = true;
             break;

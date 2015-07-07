@@ -43,6 +43,10 @@ typedef struct {
     void          * end[];
 } item;
 
+struct settings {
+    unsigned int item_size;
+} settings;
+
 #define ITEM_key(item) (((char*)&((item)->end[0])) \
          + (((item)->it_flags & ITEM_CAS) ? sizeof(unsigned long long) : 0))
 

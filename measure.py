@@ -27,8 +27,8 @@ def measure_c(col):
     timer = AvgCyclesBetween(lambda e: e.name == 'memcached:c_end',
                              lambda e: e.name == 'memcached:c_begin', 
                              lambda e: e.name == 'memcached:c_end')
-    counter = AvgValue('memcached:inside_cc', 'inside')
-    counter_sections = AvgValue('memcached:c_end', 'num_sections')
+    counter = AvgValue(lambda e: e.name == 'memcached:inside_cc', lambda e: e['inside'])
+    counter_sections = AvgValue(lambda e: e.name == 'memcached:c_end', lambda e: e['num_sections'])
 
     for event in col.events:
         timer.push(event)
@@ -40,10 +40,31 @@ def measure_c(col):
     return (samples, c, cc, c_dev, sections)
 
 def measure_n(col):
-    counter = AvgValue('memcached:contention', 'cnt')
+    counter = AvgValue(lambda e: e.name == 'memcached:contention', lambda e: e['cnt'])
     for event in col.events:
         counter.push(event)
     return counter.summary()
+
+def measure_blocks(col):
+    counters = Count(lambda e: e.name == 'memcached:block_id', lambda e: e['id'])
+    for event in col.events:
+        counters.push(event)
+    return counters.summary()
+
+max_nblks = 10
+
+def count_blocks(col):
+    counters = dict()
+    for i in range(0,max_nblks):
+        counters[i] = AvgValue(lambda e: e.name == 'memcached:blk_cnts', lambda e: e['cnts'][i] if (len(e['cnts'])>i) else 0)
+    for event in col.events:
+        for i in range(0,max_nblks):
+            counters[i].push(event)
+
+#    for i in range(0,max_nblks):
+#        print ("samples{0}: {1}".format(i,counters[i].samples))
+
+    return {k: (cnt.summary()[1]) for k, cnt in counters.items()}
 
 #def calibrate_idle_cost(col):
 ##    contention = CountContentions(lambda e: e.name == 'memcached:calib_lock' , lambda e: e.name == 'memcached:calib_unlock')
@@ -77,14 +98,14 @@ def calibrate_num_cycles(col):
 #    (uncont, cont, m) = contention.summary()
     return timer.summary()
 
-def dummy_command(threads, locking):
-    return "time ./dummy {0} {1} 10000 {2} {3}".format(threads, locking, NUM_DUMMY_RACING_CYCLES, NUM_DUMMY_INDEPENDENT_CYCLES)
+def dummy_command(threads, locking, iterations = 10000):
+    return "time ./dummy {0} {1} {2} {3} {4}".format(threads, locking, iterations, NUM_DUMMY_RACING_CYCLES, NUM_DUMMY_INDEPENDENT_CYCLES)
 
-def memcached_command(threads, locking):
+def memcached_command(threads, locking, iterations = 50000):
     if locking == 'c':
-        return "time ./memcached_c -t {0}".format(threads)
+        return "time ./memcached_c -t {0} -N {1} -j{2}".format(threads, iterations, item_size)
     else:
-        return "time ./memcached_f -t {0}".format(threads)
+        return "time ./memcached_f -t {0} -N {1} -j{2}".format(threads, iterations, item_size)
 
 def get_cpu_speed():
     proc = subprocess.Popen(["cat","/proc/cpuinfo"],
@@ -109,11 +130,24 @@ def profile_locks(cmd):
                      , ['memcached:contention']
                      , measure_n)[1]
 
+    (nsamples, blk_samples) = lttng_session( "profile_block_costs"
+                                           , cmd(1,'c')
+                                           , ['memcached:block_id']
+                                           , measure_blocks)
+
+
+    blk_cnts = lttng_session( "profile_block_counts"
+                            , cmd(1,'c')
+                            , ['memcached:blk_cnts']
+                            , count_blocks)
+    
+    blk_costs = {k: ((blk_samples[k] * c / nsamples), v) for k, v in blk_cnts.items() if k in blk_samples}
+
     nn = lttng_session( "profile_contention"
                       , cmd(multiprocessing.cpu_count(),'f')
                       , ['memcached:contention']
                       , measure_n)[1]
-    return((c,c_dev),cc,n,nn,sections)
+    return((c,c_dev),cc,n,nn,sections,blk_costs)
 
 if __name__ == '__main__':
     l = dict()
@@ -134,23 +168,45 @@ if __name__ == '__main__':
 
     ll = interpolate_l(l)
 #    ((c,c_dev),(cc,cc_dev),n,nn_measured) = profile_locks(dummy_command)
-    ((c,c_dev),cc,n,nn_measured,sections) = profile_locks(memcached_command)
 
-    for i in range(1,MAX_CALIBRATION_THREADS+1):
-        print ("l({0})={1}".format(i,l[i]))
-    print ("c = {0} (std={1})".format (c, c_dev))
-    print ("c' = {0}".format (cc))
-    print ("#crit sections = {0}".format (sections))
-    print ("n = {0}".format (n))
-    print ("n' (measured) = {0}".format (nn_measured))
+    for item_size in {2 ** i for i in range(10,20)}:
+        ((c,c_dev),cc,n,nn_measured,sections,blk_costs) = profile_locks(memcached_command)
 
-    nn = solve_nn (n, c, cc, l, sections)
+        for i in range(1,MAX_CALIBRATION_THREADS+1):
+            print ("l({0})={1}".format(i,l[i]))
+        print ("c = {0} (std={1})".format (c, c_dev))
+        print ("c' = {0}".format (cc))
+        print ("#crit sections = {0}".format (sections))
+        print ("n' (measured) = {0}".format (nn_measured))
+
+        report = ''
+        for k, (cost, cnt) in blk_costs.items():
+            report += "BLOCK_PROF_DATA: block{0} {1} {2}\n".format(k,cost,cnt)
+
+        report += '\n'
+        report += "GLOBAL_PROF_DATA: n {0}\n".format (n)
+        report += "GLOBAL_PROF_DATA: c {0}\n".format (c)
+        for i in range(1,MAX_CALIBRATION_THREADS+1):
+            report += "GLOBAL_PROF_DATA: l_map {0} {1}\n".format(i,l[i])
+        report += '\n'
+        report += "ESTIMATED_DATA: N_bound 4\n"
+
+        print(report)
     
-    print ("n' (predicted) = {0}".format (nn))
+        f = open("report{0}".format(item_size), 'w')
+        f.write(report)
+        f.close
 
-    cost_coarse = n * (c + ll(n))
-    cost_fine   = nn * (cc + sections * ll(nn)) + (c-cc)
+#    print ("blk_costs: {0}".format (blk_costs))
 
-    print ("estimated cost of coarse-grained locking: {0}".format(cost_coarse))
-    print ("estimated cost of fine-grained locking: {0}".format(cost_fine))
-    print ("speed-up with fine-grained locking:: {0}".format(cost_coarse/cost_fine))
+# The following requires directly measuring c'
+#    nn = solve_nn (n, c, cc, l, sections)
+#    
+#    print ("n' (predicted) = {0}".format (nn))
+#
+#    cost_coarse = n * (c + ll(n))
+#    cost_fine   = nn * (cc + sections * ll(nn)) + (c-cc)
+#
+#    print ("estimated cost of coarse-grained locking: {0}".format(cost_coarse))
+#    print ("estimated cost of fine-grained locking: {0}".format(cost_fine))
+#    print ("speed-up with fine-grained locking:: {0}".format(cost_coarse/cost_fine))

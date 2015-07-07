@@ -4,22 +4,42 @@ import statistics
 def format_event(event):
     op = event.get('op', '-')
     return "{0}: {1}: tid={2}, op={3}".format(event.cycles, event.name.ljust(30), event['pthread_id'], op)
-    
-# Average value of a counter
-class AvgValue:
-    def __init__(self, event_name, cnt_name):
-        self.samples = list()
-        self.event_name = event_name
-        self.cnt_name = cnt_name
+
+# Count the number of occurrences of each key
+class Count:
+    def __init__(self, event_filter, key_func):
+        self.counters = dict()
+        self.nsamples = 0
+        self.event_filter = event_filter
+        self.key_func = key_func
 
     def push(self, event):
-        if self.event_name == event.name:
-            self.samples.append(event[self.cnt_name])
+        if self.event_filter(event):
+            self.nsamples += 1
+            key = self.key_func(event)
+            if key not in self.counters: 
+                self.counters[key] = 1
+            else:
+                self.counters[key] += 1
+
+    def summary(self):
+        return (self.nsamples, self.counters)
+
+# Average value of a counter
+class AvgValue:
+    def __init__(self, event_filter, cnt_func):
+        self.samples = list()
+        self.event_filter = event_filter
+        self.cnt_func = cnt_func
+
+    def push(self, event):
+        if self.event_filter(event):
+            self.samples.append(self.cnt_func(event))
 
     def summary(self):
 #        print ("samples:", self.samples)
         if len(self.samples) == 0:
-            return 0.0        
+            return (0, 0.0, 0.0)
         else:
             m = statistics.mean(self.samples)
             if len(self.samples) >= 2:

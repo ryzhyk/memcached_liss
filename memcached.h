@@ -253,6 +253,7 @@ struct stats {
  * Globally accessible settings as derived from the commandline.
  */
 struct settings {
+    unsigned int nbench_iterations;
     size_t maxbytes;
     int maxconns;
     int port;
@@ -274,6 +275,7 @@ struct settings {
     enum protocol binding_protocol;
     int backlog;
     int item_size_max;        /* Maximum item size, and upper end for slabs */
+    int item_size;
     bool sasl;              /* SASL on/off */
 };
 

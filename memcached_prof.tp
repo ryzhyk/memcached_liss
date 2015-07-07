@@ -1,3 +1,17 @@
+TRACEPOINT_EVENT(
+    memcached,
+    blk_cnts,
+    TP_ARGS(unsigned short*, cnts,
+            unsigned short, ncnts),
+    TP_FIELDS(ctf_sequence(unsigned short, cnts, cnts, unsigned short, ncnts))
+)
+
+TRACEPOINT_EVENT(
+    memcached,
+    block_id,
+    TP_ARGS(short, id),
+    TP_FIELDS(ctf_integer(short, id, id))
+)
 
 TRACEPOINT_EVENT(
     memcached,
