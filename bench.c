@@ -31,7 +31,7 @@ atomic_ushort inside_cc = 0;
 atomic_ushort num_sections = 0;
 atomic_short block_id = 0;
 
-#define MAX_BLOCK_ID 7
+#define MAX_BLOCK_ID 8
 
 unsigned short block_cnts[MAX_BLOCK_ID+1];
 
@@ -53,10 +53,10 @@ unsigned short block_cnts[MAX_BLOCK_ID+1];
 
 #ifdef LISS
 
-#define lock_coarse(op)   {}
-#define unlock_coarse(op) {}
-#define lock_fine(op)     {}
-#define unlock_fine(op)   {}
+#define lock_coarse()   {}
+#define unlock_coarse() {}
+#define lock_fine()     {}
+#define unlock_fine()   {}
 
 int global_dummy;
 
@@ -68,56 +68,56 @@ int global_dummy;
 
 #ifdef COARSE
 
-#define lock_coarse(op)   {\
-    lock(op);\
+#define lock_coarse()   {\
+    lock();\
     tracepoint(memcached, c_begin); \
     atomic_store(&inside_c, 1); \
     atomic_store(&num_sections, 0); \
 }
-#define unlock_coarse(op) { \
+#define unlock_coarse() { \
     atomic_store(&inside_c, 0); \
     tracepoint(memcached, c_end, atomic_load(&num_sections)); \
-    unlock(op); \
+    unlock(); \
 }
 
-#define lock_fine(op)     { \
+#define lock_fine()     { \
     atomic_store(&inside_cc, 1); \
     atomic_fetch_add(&num_sections, 1); \
 }
-#define unlock_fine(op)   { \
+#define unlock_fine()   { \
     atomic_store(&inside_cc, 0); \
 }
 
 #else
 
-#define lock_coarse(op)   { \
-    tracepoint(memcached, c_begin); \
+#define lock_coarse()   { \
+    lock(); tracepoint(memcached, c_begin); \
     atomic_store(&inside_c, 1); \
     atomic_store(&num_sections, 0); \
 }
-#define unlock_coarse(op) { \
+#define unlock_coarse() { \
     atomic_store(&inside_c, 0); \
-    tracepoint(memcached, c_end, atomic_load(&num_sections)); \
+    tracepoint(memcached, c_end, atomic_load(&num_sections)); unlock(); \
 }
 
-#define lock_fine(op)     {\
-    lock(op); \
+#define lock_fine()     {\
+    lock(); \
     atomic_store(&inside_cc, 1); \
     atomic_fetch_add(&num_sections, 1); \
 }
-#define unlock_fine(op)   { \
+#define unlock_fine()   { \
     atomic_store(&inside_cc, 0); \
-    unlock(op); \
+    unlock(); \
 }
 
 #endif
 
-static void lock(char* op) {
+static void lock() {
     atomic_fetch_add(&contention_counter, 1);
     pthread_mutex_lock(&cache_lock);
 }
 
-static void unlock(char * op) {
+static void unlock() {
     pthread_mutex_unlock(&cache_lock);
     atomic_fetch_sub(&contention_counter, 1);
 }
@@ -147,7 +147,7 @@ void random_op () {
     op_t op;
 
     RESET_BLOCK_COUNTS;
-//    SET_BLOCK_ID(0);
+    SET_BLOCK_ID(0);
     long int r = random();
     if (r < RAND_MAX * 0.4) {        /* 40% */
         op = ACTION_STORE;
@@ -158,7 +158,7 @@ void random_op () {
     };
 
 
-    lock_coarse("op_store");
+    lock_coarse();
     SET_BLOCK_ID(1);
     op_store();
     op_get();
@@ -167,8 +167,8 @@ void random_op () {
 //        case ACTION_STORE:  op_store();
 ////        case ACTION_DELETE: op_delete();
 //    };
-    unlock_coarse("op_store");
-    SET_BLOCK_ID(0);
+    unlock_coarse();
+    SET_BLOCK_ID(4);
     tracepoint(memcached, blk_cnts, block_cnts, MAX_BLOCK_ID + 1);
 }
 
@@ -207,12 +207,12 @@ static void op_get() {
 
 /*    printf("%li: op_get\n", pthread_self());*/
     sprintf(key, "%li", random() % NKEYS);
-//    SET_BLOCK_ID(6);
+//    SET_BLOCK_ID(7);
     it = do_item_get (key, strlen (key));
     if (it) {
         do_item_remove (it);
     };
-//    SET_BLOCK_ID(7);
+//    SET_BLOCK_ID(8);
 /*    printf("%li: op_get done\n", pthread_self());*/
 }
 
@@ -220,7 +220,7 @@ static void op_delete() {
     char key[24];
     item *it;
 
-    SET_BLOCK_ID(4);
+    SET_BLOCK_ID(5);
 /*    printf("%li: op_delete\n", pthread_self());*/
 /*    sprintf(key, "%li", random() % NKEYS);*/
     it = do_item_get(key, strlen(key));
@@ -228,7 +228,7 @@ static void op_delete() {
         do_item_unlink(it);
         do_item_remove(it);      /* release our reference */
     };
-    SET_BLOCK_ID(5);
+    SET_BLOCK_ID(6);
 
 /*    printf("%li: op_delete done\n", pthread_self());*/
 }
@@ -281,7 +281,7 @@ static enum store_item_type do_store(item *it, int comm) {
                 return NOT_STORED;
             }
 
-            yield();
+            yield(); unlock_fine();
             SET_BLOCK_ID(2);
             /* copy data from it and old_it to new_it */
 
@@ -294,7 +294,7 @@ static enum store_item_type do_store(item *it, int comm) {
                 memcpy(ITEM_data(new_it) + it->nbytes - 2 /* CRLF */, ITEM_data(old_it), old_it->nbytes);
             }
 
-            READ_DUMMY;
+            READ_DUMMY; lock_fine();
             it = new_it;
         }
     }

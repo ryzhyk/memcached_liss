@@ -10,6 +10,7 @@ import time
 import datetime
 import subprocess
 import multiprocessing
+import timeit
 
 from analyze       import *
 from lttng_wrapper import *
@@ -103,9 +104,9 @@ def dummy_command(threads, locking, iterations = 10000):
 
 def memcached_command(threads, locking, iterations = 50000):
     if locking == 'c':
-        return "time ./memcached_c -t {0} -N {1} -j{2}".format(threads, iterations, item_size)
+        return "time ./memcached_c -m 1000 -t {0} -N {1} -j{2}".format(threads, iterations, item_size)
     else:
-        return "time ./memcached_f -t {0} -N {1} -j{2}".format(threads, iterations, item_size)
+        return "time ./memcached_f -m 1000 -t {0} -N {1} -j{2}".format(threads, iterations, item_size)
 
 def get_cpu_speed():
     proc = subprocess.Popen(["cat","/proc/cpuinfo"],
@@ -169,7 +170,7 @@ if __name__ == '__main__':
     ll = interpolate_l(l)
 #    ((c,c_dev),(cc,cc_dev),n,nn_measured) = profile_locks(dummy_command)
 
-    for item_size in {2 ** i for i in range(10,20)}:
+    for item_size in {2 ** i for i in range(5,16)}:
         ((c,c_dev),cc,n,nn_measured,sections,blk_costs) = profile_locks(memcached_command)
 
         for i in range(1,MAX_CALIBRATION_THREADS+1):
@@ -178,6 +179,16 @@ if __name__ == '__main__':
         print ("c' = {0}".format (cc))
         print ("#crit sections = {0}".format (sections))
         print ("n' (measured) = {0}".format (nn_measured))
+
+        startc = timeit.default_timer()
+        os.system(memcached_command(multiprocessing.cpu_count(),'c'))
+        stopc = timeit.default_timer()
+
+        startf = timeit.default_timer()
+        os.system(memcached_command(multiprocessing.cpu_count(),'f'))
+        stopf = timeit.default_timer()
+
+        speedup = (stopc - startc) / (stopf - startf)
 
         report = ''
         for k, (cost, cnt) in blk_costs.items():
@@ -190,12 +201,16 @@ if __name__ == '__main__':
             report += "GLOBAL_PROF_DATA: l_map {0} {1}\n".format(i,l[i])
         report += '\n'
         report += "ESTIMATED_DATA: N_bound 4\n"
+        report += "; speedup: {0}".format(speedup)
 
         print(report)
     
-        f = open("report{0}".format(item_size), 'w')
+        fname = "report{0}".format(item_size)
+        f = open(fname, 'w')
         f.write(report)
-        f.close
+        f.close()
+
+        os.system("cat block_map {0} > profiling_data{1}".format(fname,item_size))
 
 #    print ("blk_costs: {0}".format (blk_costs))
 

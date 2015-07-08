@@ -43,13 +43,13 @@ LOCATION_BLOCK_MAP: |0-ret do_item_get_0_42|                -> block3
 LOCATION_BLOCK_MAP: |0-w(hash)[bench.c:213]_0_43|           -> block3
 LOCATION_BLOCK_MAP: |0-end op_get_0_44|                     -> block3
 LOCATION_BLOCK_MAP: |0-ret op_get_0_45|                     -> block3
-LOCATION_BLOCK_MAP: |0-end random_op_0_46|                  -> block0
-LOCATION_BLOCK_MAP: |0-ret random_op_0_47|                  -> block0
-LOCATION_BLOCK_MAP: |0-yi[bench.c:327]_0_48|                -> block0
-LOCATION_BLOCK_MAP: |0-end tfunc_0_49|                      -> block0
-LOCATION_BLOCK_MAP: |0-ret tfunc_0_50|                      -> block0
-LOCATION_BLOCK_MAP: |0-end thread_1_0_51|                   -> block0
-LOCATION_BLOCK_MAP: |0-Exit_0_52|                           -> block0
+LOCATION_BLOCK_MAP: |0-end random_op_0_46|                  -> block4
+LOCATION_BLOCK_MAP: |0-ret random_op_0_47|                  -> block4
+LOCATION_BLOCK_MAP: |0-yi[bench.c:327]_0_48|                -> block4
+LOCATION_BLOCK_MAP: |0-end tfunc_0_49|                      -> block4
+LOCATION_BLOCK_MAP: |0-ret tfunc_0_50|                      -> block4
+LOCATION_BLOCK_MAP: |0-end thread_1_0_51|                   -> block4
+LOCATION_BLOCK_MAP: |0-Exit_0_52|                           -> block4
 LOCATION_BLOCK_MAP: |1-Init_1_1|                            -> block0
 LOCATION_BLOCK_MAP: |1-start thread_2_1_2|                  -> block0
 LOCATION_BLOCK_MAP: |1-call tfunc_1_3|                      -> block0
@@ -95,23 +95,25 @@ LOCATION_BLOCK_MAP: |1-ret do_item_get_1_42|                -> block3
 LOCATION_BLOCK_MAP: |1-w(hash)[bench.c:213]_1_43|           -> block3
 LOCATION_BLOCK_MAP: |1-end op_get_1_44|                     -> block3
 LOCATION_BLOCK_MAP: |1-ret op_get_1_45|                     -> block3
-LOCATION_BLOCK_MAP: |1-end random_op_1_46|                  -> block0
-LOCATION_BLOCK_MAP: |1-ret random_op_1_47|                  -> block0
-LOCATION_BLOCK_MAP: |1-yi[bench.c:327]_1_48|                -> block0
-LOCATION_BLOCK_MAP: |1-end tfunc_1_49|                      -> block0
-LOCATION_BLOCK_MAP: |1-ret tfunc_1_50|                      -> block0
-LOCATION_BLOCK_MAP: |1-end thread_2_1_51|                   -> block0
-LOCATION_BLOCK_MAP: |1-Exit_1_52|                           -> block0
-BLOCK_PROF_DATA: block0 348.50486398026317 1.0
-BLOCK_PROF_DATA: block1 3865.2357641447365 1.0
-BLOCK_PROF_DATA: block2 982.1500712171052 0.65506
-BLOCK_PROF_DATA: block3 1225.0474006578947 1.0
+LOCATION_BLOCK_MAP: |1-end random_op_1_46|                  -> block4
+LOCATION_BLOCK_MAP: |1-ret random_op_1_47|                  -> block4
+LOCATION_BLOCK_MAP: |1-yi[bench.c:327]_1_48|                -> block4
+LOCATION_BLOCK_MAP: |1-end tfunc_1_49|                      -> block4
+LOCATION_BLOCK_MAP: |1-ret tfunc_1_50|                      -> block4
+LOCATION_BLOCK_MAP: |1-end thread_2_1_51|                   -> block4
+LOCATION_BLOCK_MAP: |1-Exit_1_52|                           -> block4
+BLOCK_PROF_DATA: block0 428.37051327895597 1.0
+BLOCK_PROF_DATA: block1 3800.4153229363787 1.0
+BLOCK_PROF_DATA: block2 977.5634790212072 0.65416
+BLOCK_PROF_DATA: block3 1460.8532888743882 1.0
+BLOCK_PROF_DATA: block4 65.90315588907016 1.0
 
-GLOBAL_PROF_DATA: n 3.751045
-GLOBAL_PROF_DATA: c 6420.9381
-GLOBAL_PROF_DATA: l_map 1 19.54859999998007
-GLOBAL_PROF_DATA: l_map 2 746.6120499999961
-GLOBAL_PROF_DATA: l_map 3 822.077500000014
-GLOBAL_PROF_DATA: l_map 4 674.6608000000124
+GLOBAL_PROF_DATA: n 3.914885
+GLOBAL_PROF_DATA: c 6733.10576
+GLOBAL_PROF_DATA: l_map 1 42.84220000001369
+GLOBAL_PROF_DATA: l_map 2 1359.6175500000245
+GLOBAL_PROF_DATA: l_map 3 536.2411999999895
+GLOBAL_PROF_DATA: l_map 4 930.0986499999999
 
 ESTIMATED_DATA: N_bound 4
+; speedup: 1.02351357611872
