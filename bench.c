@@ -277,7 +277,7 @@ static enum store_item_type do_store(item *it, int comm) {
                 if (old_it != NULL) {
                     do_item_remove(old_it);
                 };
-
+                SET_BLOCK_ID(3);
                 return NOT_STORED;
             }
 
@@ -295,10 +295,10 @@ static enum store_item_type do_store(item *it, int comm) {
             }
 
             READ_DUMMY;
-            SET_BLOCK_ID(3);
             it = new_it;
         }
     }
+    SET_BLOCK_ID(3);
 
     if (stored == NOT_STORED) {
         if (old_it != NULL)
