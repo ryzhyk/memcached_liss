@@ -213,10 +213,11 @@ if __name__ == '__main__':
         for i in range(1,MAX_CALIBRATION_THREADS+1):
             report += "GLOBAL_PROF_DATA: L_map {0} {1}\n".format(i,L[i])
         report += '\n'
+        report += "GLOBAL_PROF_DATA: cutoff 3000\n"
+        report += '\n'
         report += "ESTIMATED_DATA: N_bound 4\n"
         report += "; speedup: {0}".format(speedup)
         report += '\n'
-        report += "GLOBAL_PROF_DATA: cutoff 5000\n"
         print(report)
     
         fname = "report{0}".format(item_size)
