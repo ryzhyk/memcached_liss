@@ -170,7 +170,7 @@ if __name__ == '__main__':
     ll = interpolate_l(l)
 #    ((c,c_dev),(cc,cc_dev),n,nn_measured) = profile_locks(dummy_command)
 
-    for item_size in {2 ** i for i in range(5,16)}:
+    for item_size in {2 ** i for i in range(5,17)}:
         ((c,c_dev),cc,n,nn_measured,sections,blk_costs) = profile_locks(memcached_command)
 
         for i in range(1,MAX_CALIBRATION_THREADS+1):

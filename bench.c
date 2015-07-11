@@ -336,5 +336,4 @@ void thread_2() {
     tfunc();
 }
 
-
 #endif
