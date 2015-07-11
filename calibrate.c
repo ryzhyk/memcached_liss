@@ -14,6 +14,7 @@ static void* worker_thread_async(void*arg) {
     tracepoint(memcached, start_calibrate_thread);
     for (i = 0; i<niter; i++) {
         for (j=0; j<nidle; j++);
+        for (j=0; j<nidle; j++);
     };
     tracepoint(memcached, end_calibrate_thread);
     pthread_exit(NULL);
@@ -27,6 +28,7 @@ static void* worker_thread1(void*arg) {
         pthread_mutex_lock(&lock);
         for (j=0; j<nidle; j++);
         pthread_mutex_unlock(&lock);
+        for (j=0; j<nidle; j++);
     };
     tracepoint(memcached, end_calibrate_thread);
     pthread_exit(NULL);
