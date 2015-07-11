@@ -151,31 +151,33 @@ def profile_locks(cmd):
     return((c,c_dev),cc,n,nn,sections,blk_costs)
 
 if __name__ == '__main__':
-    l = dict()
+    L = dict()
     cpu_hz = get_cpu_speed() * 1000000
     for i in range(1,MAX_CALIBRATION_THREADS+1):
         os.environ['TIME'] = '%w\n%S'
-        lines = subprocess.check_output(["time", "./calibrate", "s", str(i), str(NUM_CALIBRATION_CYCLES), str(NUM_IDLE_CYCLES)], stderr=subprocess.STDOUT).decode().split("\n")
+        lines = subprocess.check_output(["time", "./calibrate", "s", "L", str(i), str(NUM_CALIBRATION_CYCLES), str(NUM_IDLE_CYCLES)], stderr=subprocess.STDOUT).decode().split("\n")
         print(lines)
         nsyscalls = int(lines[1])
         kerntime = float(lines[2])
-        l[i] = (kerntime / nsyscalls) * cpu_hz
+        L[i] = (kerntime / nsyscalls) * cpu_hz
 
-#    idle = lttng_session("calibrate", "time ./calibrate a 1" + " " + str(NUM_CALIBRATION_CYCLES) + " " + str(NUM_IDLE_CYCLES), 
-#                         ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
-#    idle_cost = idle[1] / NUM_CALIBRATION_CYCLES
-#    print ("idle calibration cycle estimate: {0}".format(idle_cost))
-#    for i in range(1,MAX_CALIBRATION_THREADS+1):
-#        # calibration run with multiple threads
-#        res = lttng_session("calibrate", "time ./calibrate s " + str(i) + " " + str(NUM_CALIBRATION_CYCLES) + " " + str(NUM_IDLE_CYCLES),
-#                            ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
-#        l[i] = ((res[1] / NUM_CALIBRATION_CYCLES) - idle_cost)
+    l = dict()
+    idle = lttng_session("calibrate", "time ./calibrate a l 1 " + str(NUM_CALIBRATION_CYCLES) + " " + str(NUM_IDLE_CYCLES), 
+                         ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
+    idle_cost = idle[1] / NUM_CALIBRATION_CYCLES
+    print ("idle calibration cycle estimate: {0}".format(idle_cost))
+    for i in range(1,MAX_CALIBRATION_THREADS+1):
+        # calibration run with multiple threads
+        res = lttng_session("calibrate", "time ./calibrate s l " + str(i) + " " + str(NUM_CALIBRATION_CYCLES) + " " + str(NUM_IDLE_CYCLES),
+                            ['memcached:start_calibrate_thread', 'memcached:end_calibrate_thread'], calibrate_num_cycles)
+        l[i] = ((res[1] / NUM_CALIBRATION_CYCLES) - idle_cost)
 #        contended_cost = threadavg / NUM_CALIBRATION_CYCLES
 #    l[3] = l[2]
 #    l[4] = l[2]
     print("l: {0}".format(l))
 
     ll = interpolate_l(l)
+    LL = interpolate_l(L)
 #    ((c,c_dev),(cc,cc_dev),n,nn_measured) = profile_locks(dummy_command)
 
     for item_size in {2 ** i for i in range(5,16)}:
@@ -208,9 +210,13 @@ if __name__ == '__main__':
         for i in range(1,MAX_CALIBRATION_THREADS+1):
             report += "GLOBAL_PROF_DATA: l_map {0} {1}\n".format(i,l[i])
         report += '\n'
+        for i in range(1,MAX_CALIBRATION_THREADS+1):
+            report += "GLOBAL_PROF_DATA: L_map {0} {1}\n".format(i,L[i])
+        report += '\n'
         report += "ESTIMATED_DATA: N_bound 4\n"
         report += "; speedup: {0}".format(speedup)
-
+        report += '\n'
+        report += "GLOBAL_PROF_DATA: cutoff 5000\n"
         print(report)
     
         fname = "report{0}".format(item_size)
