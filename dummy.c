@@ -5,6 +5,8 @@
 #include <memcached_prof.h>
 #include <stdatomic.h>
 
+#define yield() {}
+
 atomic_ushort contention_counter = 0;
 
 long ncontended;
@@ -48,6 +50,7 @@ static void delay () {
 static void shared1 () {
     long i;
     for (i = 0; i < ncontended; i++, work1());
+    yield();
 }
 
 static void shared2 () {
@@ -67,45 +70,93 @@ static void* worker_thread_coarse(void*arg) {
     long j;
     for (j = 0; j < niter; j++) {
         lock();
-        tracepoint(memcached, c_begin);
-        tracepoint(memcached, contention, atomic_load(&contention_counter));
+
         shared1();
         shared2();
         local();
         shared3();
-        tracepoint(memcached, c_end, 2);
+        
         unlock();
     };
-    pthread_exit(NULL);
 }
 
 static void* worker_thread_fine(void*arg) {
     long j;
     for (j = 0; j < niter; j++) {
         lock();
-        tracepoint(memcached, c_begin);
-        tracepoint(memcached, cc_begin);
         shared1();
-        tracepoint(memcached, cc_end);
-        tracepoint(memcached, contention, atomic_load(&contention_counter));
+        unlock();
+        
+        lock();
+        shared2();
+        unlock();
+
+        local();
+        
+        lock();
+        shared3();
+        unlock();
+    };
+}
+
+static void* worker_thread_finer1(void*arg) {
+    long j;
+    for (j = 0; j < niter; j++) {
+        lock();
+        shared1();
+        unlock();
+        
+        lock();
+        shared2();
+        local();
+        shared3();
+        unlock();
+    };
+}
+
+static void* worker_thread_finer2(void*arg) {
+    long j;
+    for (j = 0; j < niter; j++) {
+        lock();
+        shared1();
+        shared2();
         unlock();
 
         local();
 
         lock();
-        tracepoint(memcached, cc_begin);
         shared3();
-        tracepoint(memcached, cc_end);
-        tracepoint(memcached, c_end, 2);
         unlock();
-
-/*        for (i = 0; i < nfalse; i++, work2());*/
     };
-    pthread_exit(NULL);
 }
 
+//static void* worker_thread_fine(void*arg) {
+//    long j;
+//    for (j = 0; j < niter; j++) {
+//        lock();
+//        tracepoint(memcached, c_begin);
+//        tracepoint(memcached, cc_begin);
+//        shared1();
+//        tracepoint(memcached, cc_end);
+//        tracepoint(memcached, contention, atomic_load(&contention_counter));
+//        unlock();
+//
+//        local();
+//
+//        lock();
+//        tracepoint(memcached, cc_begin);
+//        shared3();
+//        tracepoint(memcached, cc_end);
+//        tracepoint(memcached, c_end, 2);
+//        unlock();
+//
+///*        for (i = 0; i < nfalse; i++, work2());*/
+//    };
+//    pthread_exit(NULL);
+//}
+
 static void usage(char* argv[]) {
-    fprintf(stderr, "usage: %s <num_threads> [c|f] <num_iterations> <num_racing_cycles> <num_independent_cycles>\n", argv[0]);
+    fprintf(stderr, "usage: %s <num_threads> [f|1|2|c] <num_iterations> <num_racing_cycles> <num_independent_cycles>\n", argv[0]);
 }
 
 int main(int argc, char* argv[]) {
@@ -115,18 +166,26 @@ int main(int argc, char* argv[]) {
     int nthreads;
     cpu_set_t cpuset;
     char* locking;
+    void* (*tfunc)(void*); 
 
     if (argc != 6) {
         usage(argv);
         exit(-1);
     };
+
     nthreads   = atoi(argv[1]);
     if (*argv[2] == 'c') {
-        coarse = 1;
+        tfunc = worker_thread_coarse;
         locking = "coarse-grained";
     } else if (*argv[2] == 'f') {
-        coarse = 0;
+        tfunc = worker_thread_fine;
         locking = "fine-grained";
+    } else if (*argv[2] == '1') {
+        tfunc = worker_thread_finer1;
+        locking = "finer 1";
+    } else if (*argv[2] == '2') {
+        tfunc = worker_thread_finer2;
+        locking = "finer 2";
     } else {
         usage(argv);
         exit(-1);
@@ -142,11 +201,7 @@ int main(int argc, char* argv[]) {
 
     tracepoint(memcached, begin, "dummy_run");
     for (i = 0; i < nthreads; i++) {
-        if (coarse) {
-            rc = pthread_create(&threads[i], NULL, worker_thread_coarse, (void *)NULL);
-        } else {
-            rc = pthread_create(&threads[i], NULL, worker_thread_fine, (void *)NULL);
-        };
+        rc = pthread_create(&threads[i], NULL, tfunc, (void *)NULL);
         if (rc){
             fprintf(stderr, "ERROR; return code from pthread_create() is %d\n", rc);
             exit(-1);
